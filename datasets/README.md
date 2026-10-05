@@ -1,0 +1,5 @@
+# Dataset management
+
+Recommended corpus: the balanced Phishing-Email-Detection-Dataset at Zenodo DOI `10.5281/zenodo.17314806` (CC BY 4.0; authors and provenance in `manifest.json`). The 358.8 MB release is not included in source control. Download separately into `datasets/raw/`, verify its published MD5, inspect the schema, then map only message text and labels into UTF-8 CSV columns `text,label` (`phishing` or `benign`). Record selected source columns, label mapping, and any exclusions. The training pipeline records the normalized CSV SHA-256.
+
+Merged-source random splits may leak source, campaign, or near-duplicate artifacts. Historical corpora do not establish current generalization, and balanced sampling is unlike operational prevalence. Deduplicate exact and near-duplicate messages before splitting; a source-aware or temporal external test is preferable. Do not redistribute the corpus without reviewing license attribution and original source terms. Hand-authored unit-test samples are not a training dataset.

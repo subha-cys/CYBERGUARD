@@ -1,0 +1,40 @@
+[project]
+name = "cyberguard-detection-foundation"
+version = "0.1.0"
+description = "Explainable cybersecurity detection foundation for CYBERGUARD"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "scikit-learn>=1.4,<2",
+    "joblib>=1.3,<2",
+    "numpy>=1.26,<3",
+    "beautifulsoup4>=4.12",
+    "imageio>=2.38.0",
+    "opencv-python>=5.0.0.93",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[project.scripts]
+cyberguard = "backend.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--basetemp=.pytest_tmp -p no:cacheprovider"
+
+[tool.setuptools.packages.find]
+include = [
+    "backend*",
+    "config*",
+    "database*",
+    "datasets*",
+    "detectors*",
+    "explainability*",
+    "features*",
+    "fusion*",
+    "response*",
+    "risk*",
+    "training*",
+]

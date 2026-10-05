@@ -1,0 +1,23 @@
+{
+  "model_mode": "lightweight",
+  "image_analysis": {
+    "ela_quality": 90,
+    "fft_radial_bins": 32,
+    "noise_patch_size": 32,
+    "ela_threshold": 12.0,
+    "fft_spike_threshold": 2.2
+  },
+  "video_analysis": {
+    "max_sampled_frames": 24,
+    "frame_sample_rate_fps": 1.0,
+    "ssim_drop_threshold": 0.15,
+    "optical_flow_jitter_threshold": 3.5
+  },
+  "audio_analysis": {
+    "sample_rate_target": 16000,
+    "vocoder_cutoff_threshold_hz": 8000,
+    "natural_jitter_min": 0.002,
+    "natural_shimmer_min": 0.015,
+    "silence_threshold_db": -50.0
+  }
+}

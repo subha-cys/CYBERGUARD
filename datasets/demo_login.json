@@ -1,0 +1,9 @@
+{
+  "user_id": "synthetic-demo",
+  "timestamp": "2026-01-01T03:00:00Z",
+  "ip": "192.0.2.10",
+  "country": "ZZ",
+  "device_id": "synthetic-new-device",
+  "failed_attempts": 6,
+  "successful_login": true
+}

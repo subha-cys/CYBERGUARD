@@ -1,0 +1,197 @@
+{
+  "email_input": {
+    "text": "URGENT: Your mailbox storage is full. Click this link and verify your email password immediately to prevent account suspension.",
+    "sender": "IT Support <alert@example.org>",
+    "displayed_url": "http://192.0.2.44/verify",
+    "data_is_synthetic": true
+  },
+  "phishing_detector": {
+    "detector": "phishing_nlp",
+    "detector_version": "phishing-nlp-1.0.0",
+    "method": "ml",
+    "classification": "phishing",
+    "confidence": null,
+    "evidence": [],
+    "features": {
+      "input_character_count": 127,
+      "decision_margin_not_probability": 1.836781490178258,
+      "feature_version": "tfidf-word-1.0.0"
+    },
+    "limitations": [
+      "Metrics describe this corpus and random stratified split only.",
+      "External and temporal generalization is unmeasured.",
+      "The selected Linear SVM has no calibrated confidence output."
+    ],
+    "processing_time_ms": 10.799699986819178,
+    "timestamp": "2026-09-25T14:50:56.686823+00:00",
+    "model_version": "phishing-tfidf-linear-1.0.0",
+    "confidence_status": "unavailable"
+  },
+  "phishing_rules_detector": {
+    "detector": "phishing_security_rules",
+    "detector_version": "phishing-security-rules-1.0.0",
+    "method": "rule",
+    "classification": "security_indicators",
+    "confidence": null,
+    "evidence": [
+      {
+        "type": "security_rule",
+        "indicator": "urgency",
+        "value": true
+      },
+      {
+        "type": "security_rule",
+        "indicator": "credential_request",
+        "value": true
+      },
+      {
+        "type": "security_rule",
+        "indicator": "url_presence",
+        "value": true
+      },
+      {
+        "type": "security_rule",
+        "indicator": "sender_domain_mismatch",
+        "value": true
+      }
+    ],
+    "features": {
+      "urgency": true,
+      "credential_request": true,
+      "financial_request": false,
+      "impersonation_language": false,
+      "attachment_indicator": false,
+      "suspicious_wording": false,
+      "url_presence": true,
+      "sender_domain_mismatch": true,
+      "feature_version": "security-text-1.0.0"
+    },
+    "limitations": [
+      "Rules are independent indicators and do not prove maliciousness."
+    ],
+    "processing_time_ms": 0.1341000315733254,
+    "timestamp": "2026-09-25T14:50:56.690373+00:00",
+    "model_version": null,
+    "confidence_status": "not_applicable"
+  },
+  "url_detector": {
+    "detector": "url_lexical",
+    "detector_version": "url-lexical-1.0.0",
+    "method": "heuristic",
+    "classification": "suspicious_indicators",
+    "confidence": null,
+    "evidence": [
+      {
+        "type": "lexical_indicator",
+        "indicator": "ip_literal_host",
+        "value": true
+      },
+      {
+        "type": "lexical_indicator",
+        "indicator": "suspicious_tokens",
+        "value": true
+      }
+    ],
+    "features": {
+      "url_length": 24,
+      "subdomain_count": 0,
+      "special_character_count": 7,
+      "suspicious_tokens": [
+        "verify"
+      ],
+      "ip_literal_host": true,
+      "entropy_bits_per_character": 3.9387,
+      "encoded_character_count": 0,
+      "path_length": 7,
+      "query_length": 0,
+      "at_symbol_present": false,
+      "https_scheme": false,
+      "feature_version": "url-lexical-1.0.0"
+    },
+    "limitations": [
+      "Lexical indicators do not prove maliciousness.",
+      "URL was not fetched or resolved."
+    ],
+    "processing_time_ms": 0.24020002456381917,
+    "timestamp": "2026-09-25T14:50:56.690652+00:00",
+    "model_version": null,
+    "confidence_status": "not_applicable"
+  },
+  "login_input": {
+    "user_id": "synthetic-demo",
+    "timestamp": "2026-01-01T03:00:00Z",
+    "ip": "192.0.2.10",
+    "country": "ZZ",
+    "device_id": "synthetic-new-device",
+    "failed_attempts": 6,
+    "successful_login": true,
+    "data_is_synthetic": true
+  },
+  "login_rules_detector": {
+    "detector": "login_anomaly",
+    "detector_version": "login-rules-1.0.0",
+    "method": "rule",
+    "classification": "anomalous_indicators",
+    "confidence": null,
+    "evidence": [
+      {
+        "type": "security_rule",
+        "indicator": "repeated_failures",
+        "value": true
+      },
+      {
+        "type": "security_rule",
+        "indicator": "successful_login_after_failures",
+        "value": true
+      },
+      {
+        "type": "security_rule",
+        "indicator": "unusual_hour_indicator",
+        "value": true
+      }
+    ],
+    "features": {
+      "login_hour_utc": 3,
+      "failed_attempts": 6,
+      "successful_login": true,
+      "country": "ZZ",
+      "device_id_present": true,
+      "history_available": false
+    },
+    "limitations": [
+      "No historical user baseline was supplied.",
+      "Rules indicate triage signals, not confirmed account takeover."
+    ],
+    "processing_time_ms": 0.004200031980872154,
+    "timestamp": "2026-09-25T14:50:56.690706+00:00",
+    "model_version": null,
+    "confidence_status": "not_applicable"
+  },
+  "login_ml_detector": {
+    "detector": "login_anomaly_iforest",
+    "detector_version": "login-iforest-1.0.0",
+    "method": "ml",
+    "classification": "anomalous_indicators",
+    "confidence": null,
+    "evidence": [
+      {
+        "type": "model_indicator",
+        "indicator": "isolation_forest_outlier",
+        "value": true
+      }
+    ],
+    "features": {
+      "decision_function_score_higher_is_more_normal": -0.035018732894639304,
+      "feature_version": "login-hour-failures-success-1.0.0",
+      "history_available": false
+    },
+    "limitations": [
+      "Metrics measure recovery of deliberately separable synthetic patterns only.",
+      "Not evidence of real-world account takeover performance."
+    ],
+    "processing_time_ms": 27.48509997036308,
+    "timestamp": "2026-09-25T14:50:56.852702+00:00",
+    "model_version": "login-iforest-synthetic-1.0.0",
+    "confidence_status": "not_applicable"
+  }
+}

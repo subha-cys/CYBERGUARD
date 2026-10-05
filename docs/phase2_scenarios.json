@@ -1,0 +1,2634 @@
+{
+  "pipeline": [
+    "input",
+    "detectors",
+    "evidence",
+    "fusion",
+    "risk",
+    "explanation",
+    "response"
+  ],
+  "scenarios": [
+    {
+      "scenario": "A_normal_email",
+      "input": {
+        "text": "Quarterly planning meeting is Tuesday at 10 AM. Please review the revised agenda before joining.",
+        "synthetic": true
+      },
+      "detector_results": [
+        {
+          "detector": "phishing_nlp",
+          "detector_version": "phishing-nlp-1.0.0",
+          "method": "ml",
+          "classification": "benign",
+          "confidence": null,
+          "evidence": [],
+          "features": {
+            "input_character_count": 96,
+            "decision_margin_not_probability": -1.5425631916613307,
+            "feature_version": "tfidf-word-1.0.0"
+          },
+          "limitations": [
+            "Metrics describe this corpus and random stratified split only.",
+            "External and temporal generalization is unmeasured.",
+            "The selected Linear SVM has no calibrated confidence output."
+          ],
+          "processing_time_ms": 6.078399950638413,
+          "timestamp": "2026-09-25T15:06:45.836368+00:00",
+          "model_version": "phishing-tfidf-linear-1.0.0",
+          "confidence_status": "unavailable"
+        },
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "method": "rule",
+          "classification": "no_security_indicators",
+          "confidence": null,
+          "evidence": [],
+          "features": {
+            "urgency": false,
+            "credential_request": false,
+            "financial_request": false,
+            "impersonation_language": false,
+            "attachment_indicator": false,
+            "suspicious_wording": false,
+            "url_presence": false,
+            "sender_domain_mismatch": false,
+            "feature_version": "security-text-1.0.0"
+          },
+          "limitations": [
+            "Rules are independent indicators and do not prove maliciousness."
+          ],
+          "processing_time_ms": 0.1351999817416072,
+          "timestamp": "2026-09-25T15:06:45.836548+00:00",
+          "model_version": null,
+          "confidence_status": "not_applicable"
+        }
+      ],
+      "evidence": [],
+      "fusion": {
+        "fusion_version": "threat-fusion-1.0.0",
+        "created_at": "2026-09-25T15:06:45.836610+00:00",
+        "threat": "benign",
+        "detector_results": [
+          {
+            "detector": "phishing_nlp",
+            "detector_version": "phishing-nlp-1.0.0",
+            "model_version": "phishing-tfidf-linear-1.0.0",
+            "method": "ml",
+            "classification": "benign",
+            "normalized_threat": "phishing",
+            "normalized_signal": "conflict",
+            "confidence": null,
+            "confidence_status": "unavailable",
+            "evidence": [],
+            "features": {
+              "input_character_count": 96,
+              "decision_margin_not_probability": -1.5425631916613307,
+              "feature_version": "tfidf-word-1.0.0"
+            },
+            "limitations": [
+              "Metrics describe this corpus and random stratified split only.",
+              "External and temporal generalization is unmeasured.",
+              "The selected Linear SVM has no calibrated confidence output."
+            ]
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "no_security_indicators",
+            "normalized_threat": null,
+            "normalized_signal": "neutral",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [],
+            "features": {
+              "urgency": false,
+              "credential_request": false,
+              "financial_request": false,
+              "impersonation_language": false,
+              "attachment_indicator": false,
+              "suspicious_wording": false,
+              "url_presence": false,
+              "sender_domain_mismatch": false,
+              "feature_version": "security-text-1.0.0"
+            },
+            "limitations": [
+              "Rules are independent indicators and do not prove maliciousness."
+            ]
+          }
+        ],
+        "categories": {},
+        "supporting_detectors": [],
+        "conflicting_detectors": [],
+        "agreement": "no_signal",
+        "evidence": [],
+        "evidence_count": 0,
+        "independent_signal_count": 0,
+        "confidence_values_are_not_averaged": true
+      },
+      "risk": {
+        "policy_version": "risk-policy-1.0.0",
+        "risk_score": 0,
+        "severity": "low",
+        "contributors": [],
+        "uncapped_total": 0,
+        "incident_threshold": 50,
+        "incident_required": false,
+        "asset_sensitivity": "medium",
+        "model_confidence_is_not_risk": true
+      },
+      "explanation": {
+        "what": "The phishing text model classified the message as benign, with no conflicting detector signal.",
+        "why": [
+          "No detector reported a positive threat signal."
+        ],
+        "evidence": [],
+        "model_confidence": [
+          {
+            "detector": "phishing_nlp",
+            "confidence": null,
+            "status": "unavailable"
+          },
+          {
+            "detector": "phishing_security_rules",
+            "confidence": null,
+            "status": "not_applicable"
+          }
+        ],
+        "risk": {
+          "score": 0,
+          "severity": "low",
+          "contributors": []
+        },
+        "limitations": [
+          "Metrics describe this corpus and random stratified split only.",
+          "External and temporal generalization is unmeasured.",
+          "The selected Linear SVM has no calibrated confidence output.",
+          "Rules are independent indicators and do not prove maliciousness."
+        ],
+        "recommended_action": [],
+        "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+      },
+      "response": [],
+      "incident": null
+    },
+    {
+      "scenario": "B_suspicious_phishing_email",
+      "input": {
+        "text": "URGENT: Verify your account password immediately to prevent access suspension.",
+        "synthetic": true
+      },
+      "detector_results": [
+        {
+          "detector": "phishing_nlp",
+          "detector_version": "phishing-nlp-1.0.0",
+          "method": "ml",
+          "classification": "phishing",
+          "confidence": null,
+          "evidence": [],
+          "features": {
+            "input_character_count": 78,
+            "decision_margin_not_probability": 1.780147097937006,
+            "feature_version": "tfidf-word-1.0.0"
+          },
+          "limitations": [
+            "Metrics describe this corpus and random stratified split only.",
+            "External and temporal generalization is unmeasured.",
+            "The selected Linear SVM has no calibrated confidence output."
+          ],
+          "processing_time_ms": 1.4469000161625445,
+          "timestamp": "2026-09-25T15:06:45.838345+00:00",
+          "model_version": "phishing-tfidf-linear-1.0.0",
+          "confidence_status": "unavailable"
+        },
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "method": "rule",
+          "classification": "security_indicators",
+          "confidence": null,
+          "evidence": [
+            {
+              "type": "security_rule",
+              "indicator": "urgency",
+              "value": true
+            },
+            {
+              "type": "security_rule",
+              "indicator": "credential_request",
+              "value": true
+            }
+          ],
+          "features": {
+            "urgency": true,
+            "credential_request": true,
+            "financial_request": false,
+            "impersonation_language": false,
+            "attachment_indicator": false,
+            "suspicious_wording": false,
+            "url_presence": false,
+            "sender_domain_mismatch": false,
+            "feature_version": "security-text-1.0.0"
+          },
+          "limitations": [
+            "Rules are independent indicators and do not prove maliciousness."
+          ],
+          "processing_time_ms": 0.022899999748915434,
+          "timestamp": "2026-09-25T15:06:45.838391+00:00",
+          "model_version": null,
+          "confidence_status": "not_applicable"
+        }
+      ],
+      "evidence": [
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "urgency",
+          "value": true
+        },
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "credential_request",
+          "value": true
+        }
+      ],
+      "fusion": {
+        "fusion_version": "threat-fusion-1.0.0",
+        "created_at": "2026-09-25T15:06:45.838444+00:00",
+        "threat": "phishing",
+        "detector_results": [
+          {
+            "detector": "phishing_nlp",
+            "detector_version": "phishing-nlp-1.0.0",
+            "model_version": "phishing-tfidf-linear-1.0.0",
+            "method": "ml",
+            "classification": "phishing",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "unavailable",
+            "evidence": [],
+            "features": {
+              "input_character_count": 78,
+              "decision_margin_not_probability": 1.780147097937006,
+              "feature_version": "tfidf-word-1.0.0"
+            },
+            "limitations": [
+              "Metrics describe this corpus and random stratified split only.",
+              "External and temporal generalization is unmeasured.",
+              "The selected Linear SVM has no calibrated confidence output."
+            ]
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "security_indicators",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "security_rule",
+                "indicator": "urgency",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "credential_request",
+                "value": true
+              }
+            ],
+            "features": {
+              "urgency": true,
+              "credential_request": true,
+              "financial_request": false,
+              "impersonation_language": false,
+              "attachment_indicator": false,
+              "suspicious_wording": false,
+              "url_presence": false,
+              "sender_domain_mismatch": false,
+              "feature_version": "security-text-1.0.0"
+            },
+            "limitations": [
+              "Rules are independent indicators and do not prove maliciousness."
+            ]
+          }
+        ],
+        "categories": {
+          "phishing": {
+            "supporting_detectors": [
+              "phishing_nlp",
+              "phishing_security_rules"
+            ],
+            "conflicting_detectors": [],
+            "agreement": "multi_detector_agreement",
+            "support_count": 2
+          }
+        },
+        "supporting_detectors": [
+          "phishing_nlp",
+          "phishing_security_rules"
+        ],
+        "conflicting_detectors": [],
+        "agreement": "multi_detector_agreement",
+        "evidence": [
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "urgency",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "credential_request",
+            "value": true
+          }
+        ],
+        "evidence_count": 2,
+        "independent_signal_count": 2,
+        "confidence_values_are_not_averaged": true
+      },
+      "risk": {
+        "policy_version": "risk-policy-1.0.0",
+        "risk_score": 50,
+        "severity": "high",
+        "contributors": [
+          {
+            "factor": "credential_request",
+            "points": 20,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "detector_agreement",
+            "points": 15,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "urgency",
+            "points": 10,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "asset_sensitivity",
+            "points": 5,
+            "reason": "medium"
+          }
+        ],
+        "uncapped_total": 50,
+        "incident_threshold": 50,
+        "incident_required": true,
+        "asset_sensitivity": "medium",
+        "model_confidence_is_not_risk": true
+      },
+      "explanation": {
+        "what": "The email analysis produced a phishing assessment.",
+        "why": [
+          "phishing_nlp (phishing-nlp-1.0.0) reported phishing.",
+          "phishing_security_rules (phishing-security-rules-1.0.0) reported security_indicators."
+        ],
+        "evidence": [
+          {
+            "detector": "phishing_security_rules",
+            "indicator": "urgency",
+            "type": "security_rule",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "indicator": "credential_request",
+            "type": "security_rule",
+            "value": true
+          }
+        ],
+        "model_confidence": [
+          {
+            "detector": "phishing_nlp",
+            "confidence": null,
+            "status": "unavailable"
+          },
+          {
+            "detector": "phishing_security_rules",
+            "confidence": null,
+            "status": "not_applicable"
+          }
+        ],
+        "risk": {
+          "score": 50,
+          "severity": "high",
+          "contributors": [
+            "credential_request: +20 (observed in structured detector output)",
+            "detector_agreement: +15 (observed in structured detector output)",
+            "urgency: +10 (observed in structured detector output)",
+            "asset_sensitivity: +5 (medium)"
+          ]
+        },
+        "limitations": [
+          "Metrics describe this corpus and random stratified split only.",
+          "External and temporal generalization is unmeasured.",
+          "The selected Linear SVM has no calibrated confidence output.",
+          "Rules are independent indicators and do not prove maliciousness."
+        ],
+        "recommended_action": [
+          "quarantine_message",
+          "warn_recipient",
+          "inspect_related_messages",
+          "assess_credential_exposure",
+          "escalate_analyst"
+        ],
+        "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+      },
+      "response": [
+        {
+          "action": "quarantine_message",
+          "rationale": "Hold the message for analyst review.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "warn_recipient",
+          "rationale": "Warn the recipient not to follow links or provide credentials.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "inspect_related_messages",
+          "rationale": "Search for related messages and recipients.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "assess_credential_exposure",
+          "rationale": "If credentials were entered, follow policy for session revocation and credential reset.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "escalate_analyst",
+          "rationale": "Escalate for analyst review before taking response actions.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        }
+      ],
+      "incident": {
+        "incident_id": "648a0b4b-693b-401a-814e-74eeb382e2e5",
+        "timestamp": "2026-09-25T15:06:45.838726+00:00",
+        "threat": "phishing",
+        "severity": "high",
+        "risk_score": 50,
+        "evidence": [
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "urgency",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "credential_request",
+            "value": true
+          }
+        ],
+        "detector_outputs": [
+          {
+            "detector": "phishing_nlp",
+            "detector_version": "phishing-nlp-1.0.0",
+            "model_version": "phishing-tfidf-linear-1.0.0",
+            "method": "ml",
+            "classification": "phishing",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "unavailable",
+            "evidence": [],
+            "features": {
+              "input_character_count": 78,
+              "decision_margin_not_probability": 1.780147097937006,
+              "feature_version": "tfidf-word-1.0.0"
+            },
+            "limitations": [
+              "Metrics describe this corpus and random stratified split only.",
+              "External and temporal generalization is unmeasured.",
+              "The selected Linear SVM has no calibrated confidence output."
+            ]
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "security_indicators",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "security_rule",
+                "indicator": "urgency",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "credential_request",
+                "value": true
+              }
+            ],
+            "features": {
+              "urgency": true,
+              "credential_request": true,
+              "financial_request": false,
+              "impersonation_language": false,
+              "attachment_indicator": false,
+              "suspicious_wording": false,
+              "url_presence": false,
+              "sender_domain_mismatch": false,
+              "feature_version": "security-text-1.0.0"
+            },
+            "limitations": [
+              "Rules are independent indicators and do not prove maliciousness."
+            ]
+          }
+        ],
+        "explanation": {
+          "what": "The email analysis produced a phishing assessment.",
+          "why": [
+            "phishing_nlp (phishing-nlp-1.0.0) reported phishing.",
+            "phishing_security_rules (phishing-security-rules-1.0.0) reported security_indicators."
+          ],
+          "evidence": [
+            {
+              "detector": "phishing_security_rules",
+              "indicator": "urgency",
+              "type": "security_rule",
+              "value": true
+            },
+            {
+              "detector": "phishing_security_rules",
+              "indicator": "credential_request",
+              "type": "security_rule",
+              "value": true
+            }
+          ],
+          "model_confidence": [
+            {
+              "detector": "phishing_nlp",
+              "confidence": null,
+              "status": "unavailable"
+            },
+            {
+              "detector": "phishing_security_rules",
+              "confidence": null,
+              "status": "not_applicable"
+            }
+          ],
+          "risk": {
+            "score": 50,
+            "severity": "high",
+            "contributors": [
+              "credential_request: +20 (observed in structured detector output)",
+              "detector_agreement: +15 (observed in structured detector output)",
+              "urgency: +10 (observed in structured detector output)",
+              "asset_sensitivity: +5 (medium)"
+            ]
+          },
+          "limitations": [
+            "Metrics describe this corpus and random stratified split only.",
+            "External and temporal generalization is unmeasured.",
+            "The selected Linear SVM has no calibrated confidence output.",
+            "Rules are independent indicators and do not prove maliciousness."
+          ],
+          "recommended_action": [
+            "quarantine_message",
+            "warn_recipient",
+            "inspect_related_messages",
+            "assess_credential_exposure",
+            "escalate_analyst"
+          ],
+          "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+        },
+        "recommended_response": [
+          {
+            "action": "quarantine_message",
+            "rationale": "Hold the message for analyst review.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "warn_recipient",
+            "rationale": "Warn the recipient not to follow links or provide credentials.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "inspect_related_messages",
+            "rationale": "Search for related messages and recipients.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "assess_credential_exposure",
+            "rationale": "If credentials were entered, follow policy for session revocation and credential reset.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "escalate_analyst",
+            "rationale": "Escalate for analyst review before taking response actions.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          }
+        ],
+        "status": "open",
+        "detector_versions": [
+          {
+            "detector": "phishing_nlp",
+            "detector_version": "phishing-nlp-1.0.0",
+            "model_version": "phishing-tfidf-linear-1.0.0"
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "C_phishing_with_suspicious_url_and_credentials",
+      "input": {
+        "text": "URGENT: Your mailbox is locked. Verify your account password now to avoid suspension.",
+        "sender": "IT Support <alert@example.org>",
+        "url": "http://192.0.2.44/verify",
+        "synthetic": true
+      },
+      "detector_results": [
+        {
+          "detector": "phishing_nlp",
+          "detector_version": "phishing-nlp-1.0.0",
+          "method": "ml",
+          "classification": "phishing",
+          "confidence": null,
+          "evidence": [],
+          "features": {
+            "input_character_count": 85,
+            "decision_margin_not_probability": 2.099425359059805,
+            "feature_version": "tfidf-word-1.0.0"
+          },
+          "limitations": [
+            "Metrics describe this corpus and random stratified split only.",
+            "External and temporal generalization is unmeasured.",
+            "The selected Linear SVM has no calibrated confidence output."
+          ],
+          "processing_time_ms": 2.529999997932464,
+          "timestamp": "2026-09-25T15:06:45.844966+00:00",
+          "model_version": "phishing-tfidf-linear-1.0.0",
+          "confidence_status": "unavailable"
+        },
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "method": "rule",
+          "classification": "security_indicators",
+          "confidence": null,
+          "evidence": [
+            {
+              "type": "security_rule",
+              "indicator": "urgency",
+              "value": true
+            },
+            {
+              "type": "security_rule",
+              "indicator": "credential_request",
+              "value": true
+            },
+            {
+              "type": "security_rule",
+              "indicator": "url_presence",
+              "value": true
+            },
+            {
+              "type": "security_rule",
+              "indicator": "sender_domain_mismatch",
+              "value": true
+            }
+          ],
+          "features": {
+            "urgency": true,
+            "credential_request": true,
+            "financial_request": false,
+            "impersonation_language": false,
+            "attachment_indicator": false,
+            "suspicious_wording": false,
+            "url_presence": true,
+            "sender_domain_mismatch": true,
+            "feature_version": "security-text-1.0.0"
+          },
+          "limitations": [
+            "Rules are independent indicators and do not prove maliciousness."
+          ],
+          "processing_time_ms": 0.17829996068030596,
+          "timestamp": "2026-09-25T15:06:45.845193+00:00",
+          "model_version": null,
+          "confidence_status": "not_applicable"
+        },
+        {
+          "detector": "url_lexical",
+          "detector_version": "url-lexical-1.0.0",
+          "method": "heuristic",
+          "classification": "suspicious_indicators",
+          "confidence": null,
+          "evidence": [
+            {
+              "type": "lexical_indicator",
+              "indicator": "ip_literal_host",
+              "value": true
+            },
+            {
+              "type": "lexical_indicator",
+              "indicator": "suspicious_tokens",
+              "value": true
+            }
+          ],
+          "features": {
+            "url_length": 24,
+            "subdomain_count": 0,
+            "special_character_count": 7,
+            "suspicious_tokens": [
+              "verify"
+            ],
+            "ip_literal_host": true,
+            "entropy_bits_per_character": 3.9387,
+            "encoded_character_count": 0,
+            "path_length": 7,
+            "query_length": 0,
+            "at_symbol_present": false,
+            "https_scheme": false,
+            "feature_version": "url-lexical-1.0.0"
+          },
+          "limitations": [
+            "Lexical indicators do not prove maliciousness.",
+            "URL was not fetched or resolved."
+          ],
+          "processing_time_ms": 0.3451000084169209,
+          "timestamp": "2026-09-25T15:06:45.845583+00:00",
+          "model_version": null,
+          "confidence_status": "not_applicable"
+        }
+      ],
+      "evidence": [
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "urgency",
+          "value": true
+        },
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "credential_request",
+          "value": true
+        },
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "url_presence",
+          "value": true
+        },
+        {
+          "detector": "phishing_security_rules",
+          "detector_version": "phishing-security-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "sender_domain_mismatch",
+          "value": true
+        },
+        {
+          "detector": "url_lexical",
+          "detector_version": "url-lexical-1.0.0",
+          "model_version": null,
+          "type": "lexical_indicator",
+          "indicator": "ip_literal_host",
+          "value": true
+        },
+        {
+          "detector": "url_lexical",
+          "detector_version": "url-lexical-1.0.0",
+          "model_version": null,
+          "type": "lexical_indicator",
+          "indicator": "suspicious_tokens",
+          "value": true
+        }
+      ],
+      "fusion": {
+        "fusion_version": "threat-fusion-1.0.0",
+        "created_at": "2026-09-25T15:06:45.845648+00:00",
+        "threat": "phishing",
+        "detector_results": [
+          {
+            "detector": "phishing_nlp",
+            "detector_version": "phishing-nlp-1.0.0",
+            "model_version": "phishing-tfidf-linear-1.0.0",
+            "method": "ml",
+            "classification": "phishing",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "unavailable",
+            "evidence": [],
+            "features": {
+              "input_character_count": 85,
+              "decision_margin_not_probability": 2.099425359059805,
+              "feature_version": "tfidf-word-1.0.0"
+            },
+            "limitations": [
+              "Metrics describe this corpus and random stratified split only.",
+              "External and temporal generalization is unmeasured.",
+              "The selected Linear SVM has no calibrated confidence output."
+            ]
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "security_indicators",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "security_rule",
+                "indicator": "urgency",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "credential_request",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "url_presence",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "sender_domain_mismatch",
+                "value": true
+              }
+            ],
+            "features": {
+              "urgency": true,
+              "credential_request": true,
+              "financial_request": false,
+              "impersonation_language": false,
+              "attachment_indicator": false,
+              "suspicious_wording": false,
+              "url_presence": true,
+              "sender_domain_mismatch": true,
+              "feature_version": "security-text-1.0.0"
+            },
+            "limitations": [
+              "Rules are independent indicators and do not prove maliciousness."
+            ]
+          },
+          {
+            "detector": "url_lexical",
+            "detector_version": "url-lexical-1.0.0",
+            "model_version": null,
+            "method": "heuristic",
+            "classification": "suspicious_indicators",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "lexical_indicator",
+                "indicator": "ip_literal_host",
+                "value": true
+              },
+              {
+                "type": "lexical_indicator",
+                "indicator": "suspicious_tokens",
+                "value": true
+              }
+            ],
+            "features": {
+              "url_length": 24,
+              "subdomain_count": 0,
+              "special_character_count": 7,
+              "suspicious_tokens": [
+                "verify"
+              ],
+              "ip_literal_host": true,
+              "entropy_bits_per_character": 3.9387,
+              "encoded_character_count": 0,
+              "path_length": 7,
+              "query_length": 0,
+              "at_symbol_present": false,
+              "https_scheme": false,
+              "feature_version": "url-lexical-1.0.0"
+            },
+            "limitations": [
+              "Lexical indicators do not prove maliciousness.",
+              "URL was not fetched or resolved."
+            ]
+          }
+        ],
+        "categories": {
+          "phishing": {
+            "supporting_detectors": [
+              "phishing_nlp",
+              "phishing_security_rules",
+              "url_lexical"
+            ],
+            "conflicting_detectors": [],
+            "agreement": "multi_detector_agreement",
+            "support_count": 3
+          }
+        },
+        "supporting_detectors": [
+          "phishing_nlp",
+          "phishing_security_rules",
+          "url_lexical"
+        ],
+        "conflicting_detectors": [],
+        "agreement": "multi_detector_agreement",
+        "evidence": [
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "urgency",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "credential_request",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "url_presence",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "sender_domain_mismatch",
+            "value": true
+          },
+          {
+            "detector": "url_lexical",
+            "detector_version": "url-lexical-1.0.0",
+            "model_version": null,
+            "type": "lexical_indicator",
+            "indicator": "ip_literal_host",
+            "value": true
+          },
+          {
+            "detector": "url_lexical",
+            "detector_version": "url-lexical-1.0.0",
+            "model_version": null,
+            "type": "lexical_indicator",
+            "indicator": "suspicious_tokens",
+            "value": true
+          }
+        ],
+        "evidence_count": 6,
+        "independent_signal_count": 6,
+        "confidence_values_are_not_averaged": true
+      },
+      "risk": {
+        "policy_version": "risk-policy-1.0.0",
+        "risk_score": 92,
+        "severity": "critical",
+        "contributors": [
+          {
+            "factor": "credential_request",
+            "points": 20,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "detector_agreement",
+            "points": 15,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "domain_anomaly",
+            "points": 12,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "suspicious_url",
+            "points": 25,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "urgency",
+            "points": 10,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "url_presence",
+            "points": 5,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "asset_sensitivity",
+            "points": 5,
+            "reason": "medium"
+          }
+        ],
+        "uncapped_total": 92,
+        "incident_threshold": 50,
+        "incident_required": true,
+        "asset_sensitivity": "medium",
+        "model_confidence_is_not_risk": true
+      },
+      "explanation": {
+        "what": "The email analysis produced a phishing assessment.",
+        "why": [
+          "phishing_nlp (phishing-nlp-1.0.0) reported phishing.",
+          "phishing_security_rules (phishing-security-rules-1.0.0) reported security_indicators.",
+          "url_lexical (url-lexical-1.0.0) reported suspicious_indicators."
+        ],
+        "evidence": [
+          {
+            "detector": "phishing_security_rules",
+            "indicator": "urgency",
+            "type": "security_rule",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "indicator": "credential_request",
+            "type": "security_rule",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "indicator": "url_presence",
+            "type": "security_rule",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "indicator": "sender_domain_mismatch",
+            "type": "security_rule",
+            "value": true
+          },
+          {
+            "detector": "url_lexical",
+            "indicator": "ip_literal_host",
+            "type": "lexical_indicator",
+            "value": true
+          },
+          {
+            "detector": "url_lexical",
+            "indicator": "suspicious_tokens",
+            "type": "lexical_indicator",
+            "value": true
+          }
+        ],
+        "model_confidence": [
+          {
+            "detector": "phishing_nlp",
+            "confidence": null,
+            "status": "unavailable"
+          },
+          {
+            "detector": "phishing_security_rules",
+            "confidence": null,
+            "status": "not_applicable"
+          },
+          {
+            "detector": "url_lexical",
+            "confidence": null,
+            "status": "not_applicable"
+          }
+        ],
+        "risk": {
+          "score": 92,
+          "severity": "critical",
+          "contributors": [
+            "credential_request: +20 (observed in structured detector output)",
+            "detector_agreement: +15 (observed in structured detector output)",
+            "domain_anomaly: +12 (observed in structured detector output)",
+            "suspicious_url: +25 (observed in structured detector output)",
+            "urgency: +10 (observed in structured detector output)",
+            "url_presence: +5 (observed in structured detector output)",
+            "asset_sensitivity: +5 (medium)"
+          ]
+        },
+        "limitations": [
+          "Metrics describe this corpus and random stratified split only.",
+          "External and temporal generalization is unmeasured.",
+          "The selected Linear SVM has no calibrated confidence output.",
+          "Rules are independent indicators and do not prove maliciousness.",
+          "Lexical indicators do not prove maliciousness.",
+          "URL was not fetched or resolved."
+        ],
+        "recommended_action": [
+          "quarantine_message",
+          "warn_recipient",
+          "inspect_related_messages",
+          "block_suspicious_url_review",
+          "assess_credential_exposure",
+          "escalate_analyst"
+        ],
+        "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+      },
+      "response": [
+        {
+          "action": "quarantine_message",
+          "rationale": "Hold the message for analyst review.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "warn_recipient",
+          "rationale": "Warn the recipient not to follow links or provide credentials.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "inspect_related_messages",
+          "rationale": "Search for related messages and recipients.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "block_suspicious_url_review",
+          "rationale": "Review the URL for an authorised block-list update.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "assess_credential_exposure",
+          "rationale": "If credentials were entered, follow policy for session revocation and credential reset.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "escalate_analyst",
+          "rationale": "Escalate for analyst review before taking response actions.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        }
+      ],
+      "incident": {
+        "incident_id": "0097882f-b80d-4543-9583-f6b284fba63f",
+        "timestamp": "2026-09-25T15:06:45.845949+00:00",
+        "threat": "phishing",
+        "severity": "critical",
+        "risk_score": 92,
+        "evidence": [
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "urgency",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "credential_request",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "url_presence",
+            "value": true
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "sender_domain_mismatch",
+            "value": true
+          },
+          {
+            "detector": "url_lexical",
+            "detector_version": "url-lexical-1.0.0",
+            "model_version": null,
+            "type": "lexical_indicator",
+            "indicator": "ip_literal_host",
+            "value": true
+          },
+          {
+            "detector": "url_lexical",
+            "detector_version": "url-lexical-1.0.0",
+            "model_version": null,
+            "type": "lexical_indicator",
+            "indicator": "suspicious_tokens",
+            "value": true
+          }
+        ],
+        "detector_outputs": [
+          {
+            "detector": "phishing_nlp",
+            "detector_version": "phishing-nlp-1.0.0",
+            "model_version": "phishing-tfidf-linear-1.0.0",
+            "method": "ml",
+            "classification": "phishing",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "unavailable",
+            "evidence": [],
+            "features": {
+              "input_character_count": 85,
+              "decision_margin_not_probability": 2.099425359059805,
+              "feature_version": "tfidf-word-1.0.0"
+            },
+            "limitations": [
+              "Metrics describe this corpus and random stratified split only.",
+              "External and temporal generalization is unmeasured.",
+              "The selected Linear SVM has no calibrated confidence output."
+            ]
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "security_indicators",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "security_rule",
+                "indicator": "urgency",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "credential_request",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "url_presence",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "sender_domain_mismatch",
+                "value": true
+              }
+            ],
+            "features": {
+              "urgency": true,
+              "credential_request": true,
+              "financial_request": false,
+              "impersonation_language": false,
+              "attachment_indicator": false,
+              "suspicious_wording": false,
+              "url_presence": true,
+              "sender_domain_mismatch": true,
+              "feature_version": "security-text-1.0.0"
+            },
+            "limitations": [
+              "Rules are independent indicators and do not prove maliciousness."
+            ]
+          },
+          {
+            "detector": "url_lexical",
+            "detector_version": "url-lexical-1.0.0",
+            "model_version": null,
+            "method": "heuristic",
+            "classification": "suspicious_indicators",
+            "normalized_threat": "phishing",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "lexical_indicator",
+                "indicator": "ip_literal_host",
+                "value": true
+              },
+              {
+                "type": "lexical_indicator",
+                "indicator": "suspicious_tokens",
+                "value": true
+              }
+            ],
+            "features": {
+              "url_length": 24,
+              "subdomain_count": 0,
+              "special_character_count": 7,
+              "suspicious_tokens": [
+                "verify"
+              ],
+              "ip_literal_host": true,
+              "entropy_bits_per_character": 3.9387,
+              "encoded_character_count": 0,
+              "path_length": 7,
+              "query_length": 0,
+              "at_symbol_present": false,
+              "https_scheme": false,
+              "feature_version": "url-lexical-1.0.0"
+            },
+            "limitations": [
+              "Lexical indicators do not prove maliciousness.",
+              "URL was not fetched or resolved."
+            ]
+          }
+        ],
+        "explanation": {
+          "what": "The email analysis produced a phishing assessment.",
+          "why": [
+            "phishing_nlp (phishing-nlp-1.0.0) reported phishing.",
+            "phishing_security_rules (phishing-security-rules-1.0.0) reported security_indicators.",
+            "url_lexical (url-lexical-1.0.0) reported suspicious_indicators."
+          ],
+          "evidence": [
+            {
+              "detector": "phishing_security_rules",
+              "indicator": "urgency",
+              "type": "security_rule",
+              "value": true
+            },
+            {
+              "detector": "phishing_security_rules",
+              "indicator": "credential_request",
+              "type": "security_rule",
+              "value": true
+            },
+            {
+              "detector": "phishing_security_rules",
+              "indicator": "url_presence",
+              "type": "security_rule",
+              "value": true
+            },
+            {
+              "detector": "phishing_security_rules",
+              "indicator": "sender_domain_mismatch",
+              "type": "security_rule",
+              "value": true
+            },
+            {
+              "detector": "url_lexical",
+              "indicator": "ip_literal_host",
+              "type": "lexical_indicator",
+              "value": true
+            },
+            {
+              "detector": "url_lexical",
+              "indicator": "suspicious_tokens",
+              "type": "lexical_indicator",
+              "value": true
+            }
+          ],
+          "model_confidence": [
+            {
+              "detector": "phishing_nlp",
+              "confidence": null,
+              "status": "unavailable"
+            },
+            {
+              "detector": "phishing_security_rules",
+              "confidence": null,
+              "status": "not_applicable"
+            },
+            {
+              "detector": "url_lexical",
+              "confidence": null,
+              "status": "not_applicable"
+            }
+          ],
+          "risk": {
+            "score": 92,
+            "severity": "critical",
+            "contributors": [
+              "credential_request: +20 (observed in structured detector output)",
+              "detector_agreement: +15 (observed in structured detector output)",
+              "domain_anomaly: +12 (observed in structured detector output)",
+              "suspicious_url: +25 (observed in structured detector output)",
+              "urgency: +10 (observed in structured detector output)",
+              "url_presence: +5 (observed in structured detector output)",
+              "asset_sensitivity: +5 (medium)"
+            ]
+          },
+          "limitations": [
+            "Metrics describe this corpus and random stratified split only.",
+            "External and temporal generalization is unmeasured.",
+            "The selected Linear SVM has no calibrated confidence output.",
+            "Rules are independent indicators and do not prove maliciousness.",
+            "Lexical indicators do not prove maliciousness.",
+            "URL was not fetched or resolved."
+          ],
+          "recommended_action": [
+            "quarantine_message",
+            "warn_recipient",
+            "inspect_related_messages",
+            "block_suspicious_url_review",
+            "assess_credential_exposure",
+            "escalate_analyst"
+          ],
+          "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+        },
+        "recommended_response": [
+          {
+            "action": "quarantine_message",
+            "rationale": "Hold the message for analyst review.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "warn_recipient",
+            "rationale": "Warn the recipient not to follow links or provide credentials.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "inspect_related_messages",
+            "rationale": "Search for related messages and recipients.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "block_suspicious_url_review",
+            "rationale": "Review the URL for an authorised block-list update.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "assess_credential_exposure",
+            "rationale": "If credentials were entered, follow policy for session revocation and credential reset.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "escalate_analyst",
+            "rationale": "Escalate for analyst review before taking response actions.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          }
+        ],
+        "status": "open",
+        "detector_versions": [
+          {
+            "detector": "phishing_nlp",
+            "detector_version": "phishing-nlp-1.0.0",
+            "model_version": "phishing-tfidf-linear-1.0.0"
+          },
+          {
+            "detector": "phishing_security_rules",
+            "detector_version": "phishing-security-rules-1.0.0",
+            "model_version": null
+          },
+          {
+            "detector": "url_lexical",
+            "detector_version": "url-lexical-1.0.0",
+            "model_version": null
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "D_normal_login",
+      "input": {
+        "user_id": "synthetic-user-01",
+        "timestamp": "2026-01-01T10:00:00Z",
+        "ip": "192.0.2.10",
+        "country": "ZZ",
+        "device_id": "known-device",
+        "failed_attempts": 0,
+        "successful_login": true,
+        "synthetic": true
+      },
+      "detector_results": [
+        {
+          "detector": "login_anomaly",
+          "detector_version": "login-rules-1.0.0",
+          "method": "rule",
+          "classification": "no_rule_indicators",
+          "confidence": null,
+          "evidence": [],
+          "features": {
+            "login_hour_utc": 10,
+            "failed_attempts": 0,
+            "successful_login": true,
+            "country": "ZZ",
+            "device_id_present": true,
+            "history_available": false
+          },
+          "limitations": [
+            "No historical user baseline was supplied.",
+            "Rules indicate triage signals, not confirmed account takeover."
+          ],
+          "processing_time_ms": 0.006999995093792677,
+          "timestamp": "2026-09-25T15:06:45.849188+00:00",
+          "model_version": null,
+          "confidence_status": "not_applicable"
+        },
+        {
+          "detector": "login_anomaly_iforest",
+          "detector_version": "login-iforest-1.0.0",
+          "method": "ml",
+          "classification": "no_model_anomaly",
+          "confidence": null,
+          "evidence": [],
+          "features": {
+            "decision_function_score_higher_is_more_normal": 0.021367384316321902,
+            "feature_version": "login-hour-failures-success-1.0.0",
+            "history_available": false
+          },
+          "limitations": [
+            "Metrics measure recovery of deliberately separable synthetic patterns only.",
+            "Not evidence of real-world account takeover performance."
+          ],
+          "processing_time_ms": 31.19349997723475,
+          "timestamp": "2026-09-25T15:06:45.880447+00:00",
+          "model_version": "login-iforest-synthetic-1.0.0",
+          "confidence_status": "not_applicable"
+        }
+      ],
+      "evidence": [],
+      "fusion": {
+        "fusion_version": "threat-fusion-1.0.0",
+        "created_at": "2026-09-25T15:06:45.880516+00:00",
+        "threat": "no_threat_detected",
+        "detector_results": [
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "no_rule_indicators",
+            "normalized_threat": "account_takeover",
+            "normalized_signal": "conflict",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [],
+            "features": {
+              "login_hour_utc": 10,
+              "failed_attempts": 0,
+              "successful_login": true,
+              "country": "ZZ",
+              "device_id_present": true,
+              "history_available": false
+            },
+            "limitations": [
+              "No historical user baseline was supplied.",
+              "Rules indicate triage signals, not confirmed account takeover."
+            ]
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "detector_version": "login-iforest-1.0.0",
+            "model_version": "login-iforest-synthetic-1.0.0",
+            "method": "ml",
+            "classification": "no_model_anomaly",
+            "normalized_threat": "account_takeover",
+            "normalized_signal": "conflict",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [],
+            "features": {
+              "decision_function_score_higher_is_more_normal": 0.021367384316321902,
+              "feature_version": "login-hour-failures-success-1.0.0",
+              "history_available": false
+            },
+            "limitations": [
+              "Metrics measure recovery of deliberately separable synthetic patterns only.",
+              "Not evidence of real-world account takeover performance."
+            ]
+          }
+        ],
+        "categories": {},
+        "supporting_detectors": [],
+        "conflicting_detectors": [],
+        "agreement": "no_signal",
+        "evidence": [],
+        "evidence_count": 0,
+        "independent_signal_count": 0,
+        "confidence_values_are_not_averaged": true
+      },
+      "risk": {
+        "policy_version": "risk-policy-1.0.0",
+        "risk_score": 0,
+        "severity": "low",
+        "contributors": [],
+        "uncapped_total": 0,
+        "incident_threshold": 50,
+        "incident_required": false,
+        "asset_sensitivity": "medium",
+        "model_confidence_is_not_risk": true
+      },
+      "explanation": {
+        "what": "The login detectors reported no anomaly for the supplied event.",
+        "why": [
+          "No detector reported a positive threat signal."
+        ],
+        "evidence": [],
+        "model_confidence": [
+          {
+            "detector": "login_anomaly",
+            "confidence": null,
+            "status": "not_applicable"
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "confidence": null,
+            "status": "not_applicable"
+          }
+        ],
+        "risk": {
+          "score": 0,
+          "severity": "low",
+          "contributors": []
+        },
+        "limitations": [
+          "No historical user baseline was supplied.",
+          "Rules indicate triage signals, not confirmed account takeover.",
+          "Metrics measure recovery of deliberately separable synthetic patterns only.",
+          "Not evidence of real-world account takeover performance."
+        ],
+        "recommended_action": [],
+        "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+      },
+      "response": [],
+      "incident": null
+    },
+    {
+      "scenario": "E_suspicious_login",
+      "input": {
+        "user_id": "synthetic-user-02",
+        "timestamp": "2026-01-01T10:00:00Z",
+        "ip": "192.0.2.20",
+        "country": "ZZ",
+        "device_id": "new-device",
+        "failed_attempts": 5,
+        "successful_login": false,
+        "synthetic": true
+      },
+      "detector_results": [
+        {
+          "detector": "login_anomaly",
+          "detector_version": "login-rules-1.0.0",
+          "method": "rule",
+          "classification": "anomalous_indicators",
+          "confidence": null,
+          "evidence": [
+            {
+              "type": "security_rule",
+              "indicator": "repeated_failures",
+              "value": true
+            }
+          ],
+          "features": {
+            "login_hour_utc": 10,
+            "failed_attempts": 5,
+            "successful_login": false,
+            "country": "ZZ",
+            "device_id_present": true,
+            "history_available": false
+          },
+          "limitations": [
+            "No historical user baseline was supplied.",
+            "Rules indicate triage signals, not confirmed account takeover."
+          ],
+          "processing_time_ms": 0.004399975296109915,
+          "timestamp": "2026-09-25T15:06:45.880930+00:00",
+          "model_version": null,
+          "confidence_status": "not_applicable"
+        },
+        {
+          "detector": "login_anomaly_iforest",
+          "detector_version": "login-iforest-1.0.0",
+          "method": "ml",
+          "classification": "no_model_anomaly",
+          "confidence": null,
+          "evidence": [],
+          "features": {
+            "decision_function_score_higher_is_more_normal": 0.03266396894863044,
+            "feature_version": "login-hour-failures-success-1.0.0",
+            "history_available": false
+          },
+          "limitations": [
+            "Metrics measure recovery of deliberately separable synthetic patterns only.",
+            "Not evidence of real-world account takeover performance."
+          ],
+          "processing_time_ms": 28.15630001714453,
+          "timestamp": "2026-09-25T15:06:45.909140+00:00",
+          "model_version": "login-iforest-synthetic-1.0.0",
+          "confidence_status": "not_applicable"
+        }
+      ],
+      "evidence": [
+        {
+          "detector": "login_anomaly",
+          "detector_version": "login-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "repeated_failures",
+          "value": true
+        }
+      ],
+      "fusion": {
+        "fusion_version": "threat-fusion-1.0.0",
+        "created_at": "2026-09-25T15:06:45.909204+00:00",
+        "threat": "account_takeover",
+        "detector_results": [
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "anomalous_indicators",
+            "normalized_threat": "account_takeover",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "security_rule",
+                "indicator": "repeated_failures",
+                "value": true
+              }
+            ],
+            "features": {
+              "login_hour_utc": 10,
+              "failed_attempts": 5,
+              "successful_login": false,
+              "country": "ZZ",
+              "device_id_present": true,
+              "history_available": false
+            },
+            "limitations": [
+              "No historical user baseline was supplied.",
+              "Rules indicate triage signals, not confirmed account takeover."
+            ]
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "detector_version": "login-iforest-1.0.0",
+            "model_version": "login-iforest-synthetic-1.0.0",
+            "method": "ml",
+            "classification": "no_model_anomaly",
+            "normalized_threat": "account_takeover",
+            "normalized_signal": "conflict",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [],
+            "features": {
+              "decision_function_score_higher_is_more_normal": 0.03266396894863044,
+              "feature_version": "login-hour-failures-success-1.0.0",
+              "history_available": false
+            },
+            "limitations": [
+              "Metrics measure recovery of deliberately separable synthetic patterns only.",
+              "Not evidence of real-world account takeover performance."
+            ]
+          }
+        ],
+        "categories": {
+          "account_takeover": {
+            "supporting_detectors": [
+              "login_anomaly"
+            ],
+            "conflicting_detectors": [
+              "login_anomaly_iforest"
+            ],
+            "agreement": "conflicting",
+            "support_count": 1
+          }
+        },
+        "supporting_detectors": [
+          "login_anomaly"
+        ],
+        "conflicting_detectors": [
+          "login_anomaly_iforest"
+        ],
+        "agreement": "conflicting",
+        "evidence": [
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "repeated_failures",
+            "value": true
+          }
+        ],
+        "evidence_count": 1,
+        "independent_signal_count": 1,
+        "confidence_values_are_not_averaged": true
+      },
+      "risk": {
+        "policy_version": "risk-policy-1.0.0",
+        "risk_score": 27,
+        "severity": "medium",
+        "contributors": [
+          {
+            "factor": "threat_base",
+            "points": 10,
+            "reason": "account_takeover"
+          },
+          {
+            "factor": "repeated_failures",
+            "points": 12,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "asset_sensitivity",
+            "points": 5,
+            "reason": "medium"
+          }
+        ],
+        "uncapped_total": 27,
+        "incident_threshold": 50,
+        "incident_required": false,
+        "asset_sensitivity": "medium",
+        "model_confidence_is_not_risk": true
+      },
+      "explanation": {
+        "what": "The login analysis produced account takeover risk indicators.",
+        "why": [
+          "login_anomaly (login-rules-1.0.0) reported anomalous_indicators.",
+          "login_anomaly_iforest (login-iforest-1.0.0) reported no_model_anomaly, which conflicts with other indicators."
+        ],
+        "evidence": [
+          {
+            "detector": "login_anomaly",
+            "indicator": "repeated_failures",
+            "type": "security_rule",
+            "value": true
+          }
+        ],
+        "model_confidence": [
+          {
+            "detector": "login_anomaly",
+            "confidence": null,
+            "status": "not_applicable"
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "confidence": null,
+            "status": "not_applicable"
+          }
+        ],
+        "risk": {
+          "score": 27,
+          "severity": "medium",
+          "contributors": [
+            "threat_base: +10 (account_takeover)",
+            "repeated_failures: +12 (observed in structured detector output)",
+            "asset_sensitivity: +5 (medium)"
+          ]
+        },
+        "limitations": [
+          "No historical user baseline was supplied.",
+          "Rules indicate triage signals, not confirmed account takeover.",
+          "Metrics measure recovery of deliberately separable synthetic patterns only.",
+          "Not evidence of real-world account takeover performance."
+        ],
+        "recommended_action": [
+          "review_recent_login_history",
+          "revoke_sessions_if_compromise_confirmed",
+          "require_mfa_review",
+          "credential_reset_if_compromise_confirmed"
+        ],
+        "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+      },
+      "response": [
+        {
+          "action": "review_recent_login_history",
+          "rationale": "Review recent authentication activity and source device/IP.",
+          "priority": "normal",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "revoke_sessions_if_compromise_confirmed",
+          "rationale": "If compromise is confirmed, revoke active sessions under analyst approval.",
+          "priority": "normal",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "require_mfa_review",
+          "rationale": "Review MFA requirements for the affected account.",
+          "priority": "normal",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "credential_reset_if_compromise_confirmed",
+          "rationale": "Reset credentials if the analyst confirms compromise.",
+          "priority": "normal",
+          "approval_required": true,
+          "automatic_execution": false
+        }
+      ],
+      "incident": null
+    },
+    {
+      "scenario": "F_multiple_login_anomalies",
+      "input": {
+        "user_id": "synthetic-user-03",
+        "timestamp": "2026-01-01T03:00:00Z",
+        "ip": "192.0.2.30",
+        "country": "ZZ",
+        "device_id": "unseen-device",
+        "failed_attempts": 7,
+        "successful_login": true,
+        "synthetic": true
+      },
+      "detector_results": [
+        {
+          "detector": "login_anomaly",
+          "detector_version": "login-rules-1.0.0",
+          "method": "rule",
+          "classification": "anomalous_indicators",
+          "confidence": null,
+          "evidence": [
+            {
+              "type": "security_rule",
+              "indicator": "repeated_failures",
+              "value": true
+            },
+            {
+              "type": "security_rule",
+              "indicator": "successful_login_after_failures",
+              "value": true
+            },
+            {
+              "type": "security_rule",
+              "indicator": "unusual_hour_indicator",
+              "value": true
+            }
+          ],
+          "features": {
+            "login_hour_utc": 3,
+            "failed_attempts": 7,
+            "successful_login": true,
+            "country": "ZZ",
+            "device_id_present": true,
+            "history_available": false
+          },
+          "limitations": [
+            "No historical user baseline was supplied.",
+            "Rules indicate triage signals, not confirmed account takeover."
+          ],
+          "processing_time_ms": 0.004699977580457926,
+          "timestamp": "2026-09-25T15:06:45.909537+00:00",
+          "model_version": null,
+          "confidence_status": "not_applicable"
+        },
+        {
+          "detector": "login_anomaly_iforest",
+          "detector_version": "login-iforest-1.0.0",
+          "method": "ml",
+          "classification": "anomalous_indicators",
+          "confidence": null,
+          "evidence": [
+            {
+              "type": "model_indicator",
+              "indicator": "isolation_forest_outlier",
+              "value": true
+            }
+          ],
+          "features": {
+            "decision_function_score_higher_is_more_normal": -0.035018732894639304,
+            "feature_version": "login-hour-failures-success-1.0.0",
+            "history_available": false
+          },
+          "limitations": [
+            "Metrics measure recovery of deliberately separable synthetic patterns only.",
+            "Not evidence of real-world account takeover performance."
+          ],
+          "processing_time_ms": 28.3828999963589,
+          "timestamp": "2026-09-25T15:06:45.937965+00:00",
+          "model_version": "login-iforest-synthetic-1.0.0",
+          "confidence_status": "not_applicable"
+        }
+      ],
+      "evidence": [
+        {
+          "detector": "login_anomaly",
+          "detector_version": "login-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "repeated_failures",
+          "value": true
+        },
+        {
+          "detector": "login_anomaly",
+          "detector_version": "login-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "successful_login_after_failures",
+          "value": true
+        },
+        {
+          "detector": "login_anomaly",
+          "detector_version": "login-rules-1.0.0",
+          "model_version": null,
+          "type": "security_rule",
+          "indicator": "unusual_hour_indicator",
+          "value": true
+        },
+        {
+          "detector": "login_anomaly_iforest",
+          "detector_version": "login-iforest-1.0.0",
+          "model_version": "login-iforest-synthetic-1.0.0",
+          "type": "model_indicator",
+          "indicator": "isolation_forest_outlier",
+          "value": true
+        }
+      ],
+      "fusion": {
+        "fusion_version": "threat-fusion-1.0.0",
+        "created_at": "2026-09-25T15:06:45.938030+00:00",
+        "threat": "account_takeover",
+        "detector_results": [
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "anomalous_indicators",
+            "normalized_threat": "account_takeover",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "security_rule",
+                "indicator": "repeated_failures",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "successful_login_after_failures",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "unusual_hour_indicator",
+                "value": true
+              }
+            ],
+            "features": {
+              "login_hour_utc": 3,
+              "failed_attempts": 7,
+              "successful_login": true,
+              "country": "ZZ",
+              "device_id_present": true,
+              "history_available": false
+            },
+            "limitations": [
+              "No historical user baseline was supplied.",
+              "Rules indicate triage signals, not confirmed account takeover."
+            ]
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "detector_version": "login-iforest-1.0.0",
+            "model_version": "login-iforest-synthetic-1.0.0",
+            "method": "ml",
+            "classification": "anomalous_indicators",
+            "normalized_threat": "account_takeover",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "model_indicator",
+                "indicator": "isolation_forest_outlier",
+                "value": true
+              }
+            ],
+            "features": {
+              "decision_function_score_higher_is_more_normal": -0.035018732894639304,
+              "feature_version": "login-hour-failures-success-1.0.0",
+              "history_available": false
+            },
+            "limitations": [
+              "Metrics measure recovery of deliberately separable synthetic patterns only.",
+              "Not evidence of real-world account takeover performance."
+            ]
+          }
+        ],
+        "categories": {
+          "account_takeover": {
+            "supporting_detectors": [
+              "login_anomaly",
+              "login_anomaly_iforest"
+            ],
+            "conflicting_detectors": [],
+            "agreement": "multi_detector_agreement",
+            "support_count": 2
+          }
+        },
+        "supporting_detectors": [
+          "login_anomaly",
+          "login_anomaly_iforest"
+        ],
+        "conflicting_detectors": [],
+        "agreement": "multi_detector_agreement",
+        "evidence": [
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "repeated_failures",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "successful_login_after_failures",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "unusual_hour_indicator",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "detector_version": "login-iforest-1.0.0",
+            "model_version": "login-iforest-synthetic-1.0.0",
+            "type": "model_indicator",
+            "indicator": "isolation_forest_outlier",
+            "value": true
+          }
+        ],
+        "evidence_count": 4,
+        "independent_signal_count": 4,
+        "confidence_values_are_not_averaged": true
+      },
+      "risk": {
+        "policy_version": "risk-policy-1.0.0",
+        "risk_score": 80,
+        "severity": "critical",
+        "contributors": [
+          {
+            "factor": "threat_base",
+            "points": 10,
+            "reason": "account_takeover"
+          },
+          {
+            "factor": "detector_agreement",
+            "points": 15,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "isolation_forest_outlier",
+            "points": 10,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "repeated_failures",
+            "points": 12,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "successful_login_after_failures",
+            "points": 20,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "unusual_hour_indicator",
+            "points": 8,
+            "reason": "observed in structured detector output"
+          },
+          {
+            "factor": "asset_sensitivity",
+            "points": 5,
+            "reason": "medium"
+          }
+        ],
+        "uncapped_total": 80,
+        "incident_threshold": 50,
+        "incident_required": true,
+        "asset_sensitivity": "medium",
+        "model_confidence_is_not_risk": true
+      },
+      "explanation": {
+        "what": "The login analysis produced account takeover risk indicators.",
+        "why": [
+          "login_anomaly (login-rules-1.0.0) reported anomalous_indicators.",
+          "login_anomaly_iforest (login-iforest-1.0.0) reported anomalous_indicators."
+        ],
+        "evidence": [
+          {
+            "detector": "login_anomaly",
+            "indicator": "repeated_failures",
+            "type": "security_rule",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly",
+            "indicator": "successful_login_after_failures",
+            "type": "security_rule",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly",
+            "indicator": "unusual_hour_indicator",
+            "type": "security_rule",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "indicator": "isolation_forest_outlier",
+            "type": "model_indicator",
+            "value": true
+          }
+        ],
+        "model_confidence": [
+          {
+            "detector": "login_anomaly",
+            "confidence": null,
+            "status": "not_applicable"
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "confidence": null,
+            "status": "not_applicable"
+          }
+        ],
+        "risk": {
+          "score": 80,
+          "severity": "critical",
+          "contributors": [
+            "threat_base: +10 (account_takeover)",
+            "detector_agreement: +15 (observed in structured detector output)",
+            "isolation_forest_outlier: +10 (observed in structured detector output)",
+            "repeated_failures: +12 (observed in structured detector output)",
+            "successful_login_after_failures: +20 (observed in structured detector output)",
+            "unusual_hour_indicator: +8 (observed in structured detector output)",
+            "asset_sensitivity: +5 (medium)"
+          ]
+        },
+        "limitations": [
+          "No historical user baseline was supplied.",
+          "Rules indicate triage signals, not confirmed account takeover.",
+          "Metrics measure recovery of deliberately separable synthetic patterns only.",
+          "Not evidence of real-world account takeover performance."
+        ],
+        "recommended_action": [
+          "review_recent_login_history",
+          "revoke_sessions_if_compromise_confirmed",
+          "require_mfa_review",
+          "credential_reset_if_compromise_confirmed",
+          "escalate_analyst"
+        ],
+        "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+      },
+      "response": [
+        {
+          "action": "review_recent_login_history",
+          "rationale": "Review recent authentication activity and source device/IP.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "revoke_sessions_if_compromise_confirmed",
+          "rationale": "If compromise is confirmed, revoke active sessions under analyst approval.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "require_mfa_review",
+          "rationale": "Review MFA requirements for the affected account.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "credential_reset_if_compromise_confirmed",
+          "rationale": "Reset credentials if the analyst confirms compromise.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        },
+        {
+          "action": "escalate_analyst",
+          "rationale": "Escalate for analyst review before taking response actions.",
+          "priority": "high",
+          "approval_required": true,
+          "automatic_execution": false
+        }
+      ],
+      "incident": {
+        "incident_id": "9de70d2b-7a2c-4bbe-abc7-beff0b6df0e3",
+        "timestamp": "2026-09-25T15:06:45.938387+00:00",
+        "threat": "account_takeover",
+        "severity": "critical",
+        "risk_score": 80,
+        "evidence": [
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "repeated_failures",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "successful_login_after_failures",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "type": "security_rule",
+            "indicator": "unusual_hour_indicator",
+            "value": true
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "detector_version": "login-iforest-1.0.0",
+            "model_version": "login-iforest-synthetic-1.0.0",
+            "type": "model_indicator",
+            "indicator": "isolation_forest_outlier",
+            "value": true
+          }
+        ],
+        "detector_outputs": [
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null,
+            "method": "rule",
+            "classification": "anomalous_indicators",
+            "normalized_threat": "account_takeover",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "security_rule",
+                "indicator": "repeated_failures",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "successful_login_after_failures",
+                "value": true
+              },
+              {
+                "type": "security_rule",
+                "indicator": "unusual_hour_indicator",
+                "value": true
+              }
+            ],
+            "features": {
+              "login_hour_utc": 3,
+              "failed_attempts": 7,
+              "successful_login": true,
+              "country": "ZZ",
+              "device_id_present": true,
+              "history_available": false
+            },
+            "limitations": [
+              "No historical user baseline was supplied.",
+              "Rules indicate triage signals, not confirmed account takeover."
+            ]
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "detector_version": "login-iforest-1.0.0",
+            "model_version": "login-iforest-synthetic-1.0.0",
+            "method": "ml",
+            "classification": "anomalous_indicators",
+            "normalized_threat": "account_takeover",
+            "normalized_signal": "support",
+            "confidence": null,
+            "confidence_status": "not_applicable",
+            "evidence": [
+              {
+                "type": "model_indicator",
+                "indicator": "isolation_forest_outlier",
+                "value": true
+              }
+            ],
+            "features": {
+              "decision_function_score_higher_is_more_normal": -0.035018732894639304,
+              "feature_version": "login-hour-failures-success-1.0.0",
+              "history_available": false
+            },
+            "limitations": [
+              "Metrics measure recovery of deliberately separable synthetic patterns only.",
+              "Not evidence of real-world account takeover performance."
+            ]
+          }
+        ],
+        "explanation": {
+          "what": "The login analysis produced account takeover risk indicators.",
+          "why": [
+            "login_anomaly (login-rules-1.0.0) reported anomalous_indicators.",
+            "login_anomaly_iforest (login-iforest-1.0.0) reported anomalous_indicators."
+          ],
+          "evidence": [
+            {
+              "detector": "login_anomaly",
+              "indicator": "repeated_failures",
+              "type": "security_rule",
+              "value": true
+            },
+            {
+              "detector": "login_anomaly",
+              "indicator": "successful_login_after_failures",
+              "type": "security_rule",
+              "value": true
+            },
+            {
+              "detector": "login_anomaly",
+              "indicator": "unusual_hour_indicator",
+              "type": "security_rule",
+              "value": true
+            },
+            {
+              "detector": "login_anomaly_iforest",
+              "indicator": "isolation_forest_outlier",
+              "type": "model_indicator",
+              "value": true
+            }
+          ],
+          "model_confidence": [
+            {
+              "detector": "login_anomaly",
+              "confidence": null,
+              "status": "not_applicable"
+            },
+            {
+              "detector": "login_anomaly_iforest",
+              "confidence": null,
+              "status": "not_applicable"
+            }
+          ],
+          "risk": {
+            "score": 80,
+            "severity": "critical",
+            "contributors": [
+              "threat_base: +10 (account_takeover)",
+              "detector_agreement: +15 (observed in structured detector output)",
+              "isolation_forest_outlier: +10 (observed in structured detector output)",
+              "repeated_failures: +12 (observed in structured detector output)",
+              "successful_login_after_failures: +20 (observed in structured detector output)",
+              "unusual_hour_indicator: +8 (observed in structured detector output)",
+              "asset_sensitivity: +5 (medium)"
+            ]
+          },
+          "limitations": [
+            "No historical user baseline was supplied.",
+            "Rules indicate triage signals, not confirmed account takeover.",
+            "Metrics measure recovery of deliberately separable synthetic patterns only.",
+            "Not evidence of real-world account takeover performance."
+          ],
+          "recommended_action": [
+            "review_recent_login_history",
+            "revoke_sessions_if_compromise_confirmed",
+            "require_mfa_review",
+            "credential_reset_if_compromise_confirmed",
+            "escalate_analyst"
+          ],
+          "source": "detector evidence, fusion decisions, risk contributors, and response policy only"
+        },
+        "recommended_response": [
+          {
+            "action": "review_recent_login_history",
+            "rationale": "Review recent authentication activity and source device/IP.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "revoke_sessions_if_compromise_confirmed",
+            "rationale": "If compromise is confirmed, revoke active sessions under analyst approval.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "require_mfa_review",
+            "rationale": "Review MFA requirements for the affected account.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "credential_reset_if_compromise_confirmed",
+            "rationale": "Reset credentials if the analyst confirms compromise.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          },
+          {
+            "action": "escalate_analyst",
+            "rationale": "Escalate for analyst review before taking response actions.",
+            "priority": "high",
+            "approval_required": true,
+            "automatic_execution": false
+          }
+        ],
+        "status": "open",
+        "detector_versions": [
+          {
+            "detector": "login_anomaly",
+            "detector_version": "login-rules-1.0.0",
+            "model_version": null
+          },
+          {
+            "detector": "login_anomaly_iforest",
+            "detector_version": "login-iforest-1.0.0",
+            "model_version": "login-iforest-synthetic-1.0.0"
+          }
+        ]
+      }
+    }
+  ],
+  "created_incidents": 3
+}

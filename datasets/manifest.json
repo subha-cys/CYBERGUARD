@@ -1,0 +1,14 @@
+{
+  "dataset": "Phishing-Email-Detection-Dataset",
+  "version": "Zenodo record 17314806, v2 (2025-10-10)",
+  "url": "https://doi.org/10.5281/zenodo.17314806",
+  "source_file": "Balanced_Dataset.csv",
+  "source_md5": "c18127659164566291c18803cc7d4c5f",
+  "authors": ["Abeer Alhuzali", "Ahad Alloqmani", "Manar Aljabri", "Fatemah Alharbi"],
+  "license": "CC BY 4.0",
+  "description": "Balanced release of merged email corpus drawn from nine public corpora; see record and linked 2025 Applied Sciences paper for source composition and study details.",
+  "columns": {"text": "body", "label": "label"},
+  "label_mapping": {"0.0": "benign/safe", "1.0": "phishing (source includes spam and scam)", "training_phishing_value": "1.0", "training_benign_value": "0.0"},
+  "processing": "Map body to text and label to label. The normalizer removes exact duplicate (text,label) rows and records normalized SHA-256 and mapping.",
+  "limitations": ["Merged-source random splits may leak source, campaign, or near-duplicate artifacts.", "Source spans 1998-2008 and does not establish performance on current phishing.", "Source groups spam, scam and phishing under one positive label.", "Balanced sampling does not represent operational prevalence.", "Review original source corpus terms before redistribution."]
+}
