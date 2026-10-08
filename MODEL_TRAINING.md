@@ -58,6 +58,16 @@ The dashboard automatically uses a model if its artifact is at `models\media\aud
 
 The adapter reports no confidence. The model's synthetic-class score is explicitly recorded as an **uncalibrated score**, not as a probability. Predictions within a small margin of the validation threshold are `inconclusive`; that threshold and margin are safeguards, not guarantees of correctness.
 
+## Review-driven local learning memory
+
+For successful uploaded image, audio, or video analyses, the dashboard stores a small numeric feature snapshot in `database/learning-memory.sqlite3`. It does not save the submitted media, message text, microphone windows, filenames, or the detector's evidence text there. Synthetic demo runs and live microphone checks are excluded. This feature memory is local and is ignored by Git.
+
+On the result card, verify the actual source label and give related material a consistent **pseudonymous** source group (for example, `speaker-04`, `photo-sequence-02`, or `source-set-03`). Use the same group for samples from the same person, original recording, burst, video source, or derived generation; never use a person's name or other direct identifier. The detector's own prediction stays an untrusted baseline and is never copied as a confirmed label. Only the label you explicitly confirm is used for training.
+
+After each label confirmation, CYBERGUARD automatically attempts retraining when there are at least 40 reviewed examples, at least 20 for each label, and at least eight distinct source groups. It uses group-disjoint train/validation/test splits, selects its threshold only on validation data, and tests against the saved original predictions for the held-out groups. A new local model replaces the active media model only if its held-out synthetic-class F1 is higher and its false-positive rate is no higher than the prior assessments on that same test partition. If the data or candidate does not pass, the active model remains unchanged and the result explains why. Scores remain uncalibrated; this gate is a safeguard over the submitted local examples, not proof of real-world performance.
+
+The **Clear saved examples** control removes the feature memory but deliberately leaves an already-promoted model installed. To remove a model as well, remove the corresponding ignored artifact and registry under `models/media/` and restart the dashboard. Email, URL, login, and rule-based detectors are not trained by this media feedback memory. Live mic audio remains ephemeral.
+
 ## Evaluation and improving quality
 
 1. **Define the exact target first.** Human-vs-generated voice, camera-vs-generated image, and camera-vs-generated video are not the same as detecting edits, impersonation, or malicious intent.

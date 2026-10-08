@@ -1,5 +1,6 @@
 """Comprehensive unit and integration tests for Deepfake & Multimedia Authenticity Detection."""
 import io
+import base64
 import pytest
 from pathlib import Path
 import wave
@@ -18,7 +19,7 @@ from detectors.multimedia import _assess_voice_origin, analyze_image, analyze_au
 from features.multimedia_image import extract_image_features
 from features.multimedia_audio import _decode_pcm, extract_audio_features
 from features.multimedia_video import extract_video_features
-from backend.service import run_demo, analyze_request
+from backend.service import analyze_live_voice, analyze_request, demo_fixture_data
 from fusion.engine import fuse
 
 
@@ -153,6 +154,62 @@ def test_long_audio_analysis_is_bounded_to_ten_seconds():
     assert features["sample_count"] == sample_rate * 10
 
 
+def test_live_voice_rejects_silence_as_inconclusive_without_confidence():
+    sample_rate = 16_000
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as stream:
+        stream.setnchannels(1)
+        stream.setsampwidth(2)
+        stream.setframerate(sample_rate)
+        stream.writeframes(b"\x00\x00" * (sample_rate * 5))
+
+    result = analyze_live_voice({"content_base64": base64.b64encode(buffer.getvalue()).decode("ascii")})
+    assert result["classification"] == "inconclusive"
+    assert result["voice_origin"]["classification"] == "inconclusive"
+    assert result["confidence"] is None
+    assert result["audio_quality"]["usable"] is False
+    assert result["audio_quality"]["warnings"]
+
+
+def test_live_voice_accepts_a_speech_like_window_and_reports_audio_quality():
+    import numpy as np
+
+    sample_rate = 16_000
+    samples = (np.sin(2 * np.pi * 180 * np.arange(sample_rate * 5) / sample_rate) * 10_000).astype("<i2")
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as stream:
+        stream.setnchannels(1)
+        stream.setsampwidth(2)
+        stream.setframerate(sample_rate)
+        stream.writeframes(samples.tobytes())
+
+    result = analyze_live_voice({"content_base64": base64.b64encode(buffer.getvalue()).decode("ascii")})
+    assert result["classification"] in {"likely_human", "likely_ai_generated", "inconclusive"}
+    assert result["audio_quality"]["duration_seconds"] == 5.0
+    assert result["audio_quality"]["usable"] is True
+    assert result["confidence"] is None
+
+
+def test_live_voice_clipping_forces_inconclusive():
+    sample_rate = 16_000
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as stream:
+        stream.setnchannels(1)
+        stream.setsampwidth(2)
+        stream.setframerate(sample_rate)
+        stream.writeframes(b"\xff\x7f" * (sample_rate * 5))
+
+    result = analyze_live_voice({"content_base64": base64.b64encode(buffer.getvalue()).decode("ascii")})
+    assert result["classification"] == "inconclusive"
+    assert result["audio_quality"]["usable"] is False
+    assert any("clipping" in warning for warning in result["audio_quality"]["warnings"])
+
+
+def test_live_voice_rejects_invalid_base64():
+    with pytest.raises(ValueError, match="valid base64"):
+        analyze_live_voice({"content_base64": "not base64!"})
+
+
 def test_24_bit_pcm_is_sign_extended_and_scaled():
     pcm = bytes((0x00, 0x00, 0x80, 0xFF, 0xFF, 0x7F))
     decoded = _decode_pcm(pcm, 3)
@@ -216,7 +273,13 @@ def test_video_feature_extraction_and_detection():
     ("manipulated_video", "HIGH CONCERN", "multimedia_manipulation", 75, 100),
 ])
 def test_all_six_synthetic_demonstration_cases(demo_id, expected_concern, expected_threat, min_risk, max_risk):
-    result = run_demo(demo_id)
+    modality = "image" if "image" in demo_id else "audio" if "audio" in demo_id else "video"
+    result = analyze_request({
+        "type": modality,
+        "synthetic_demo": True,
+        "demo_id": demo_id,
+        **demo_fixture_data(demo_id),
+    }, persist_incident=False)
     assert result["concern_level"] == expected_concern
     assert result["threat_category"] == expected_threat
     if demo_id == "normal_audio":

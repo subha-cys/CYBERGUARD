@@ -1,4 +1,16 @@
 const state={view:'analysis',analysis:null,analysisKind:'email',busy:false,demoMode:null};
+const liveVoice={stream:null,context:null,processor:null,mute:null,interval:null,chunks:[],samples:0,busy:false,windows:0,session:0};
+const awarenessTips=[
+  {category:'VERIFY OUTSIDE THE MESSAGE',text:'If a request asks for money or credentials, contact the person through a number or app you already trust—not the details in the message.',sticker:'CHECK TWICE'},
+  {category:'ONE-TIME CODES ARE FOR YOU',text:'Never read a sign-in code to someone who contacted you. Enter it only in the service’s app or site that you opened yourself.',sticker:'KEEP IT PRIVATE'},
+  {category:'QR CODES HIDE THE DESTINATION',text:'Preview the full web address before opening a QR link, then check the domain for misspellings or lookalikes.',sticker:'LOOK BEFORE YOU TAP'},
+  {category:'CALLER ID CAN BE FAKED',text:'A familiar name or number on your screen is not proof of identity. Hang up and call back using a trusted contact.',sticker:'CALL BACK SAFELY'},
+  {category:'URGENCY IS A SIGNAL, NOT PROOF',text:'Pressure to act immediately is a reason to pause and verify. Urgency by itself does not prove a message is fraudulent.',sticker:'PAUSE FIRST'},
+  {category:'READ THE ACTUAL DOMAIN',text:'A brand name elsewhere in a URL can mislead. Check the hostname immediately before the first slash after “://”.',sticker:'SPOT THE DOMAIN'},
+  {category:'CHOOSE STRONGER SIGN-IN',text:'Where available, use a passkey or security key. Never approve a sign-in prompt you did not initiate.',sticker:'LOCK IT DOWN'},
+  {category:'AI VOICES CAN SOUND REAL',text:'A familiar-sounding voice is not proof. Verify unexpected requests for money or secrets through a separate trusted channel.',sticker:'TRUST, THEN VERIFY'}
+];
+let awarenessIndex=-1;
 const root=document.getElementById('viewRoot');
 function setTheme(theme){
   const selected=theme==='light'?'light':'vampire';
@@ -17,13 +29,20 @@ const revealObserver='IntersectionObserver'in window?new IntersectionObserver(en
   if(entry.isIntersecting){entry.target.classList.add('is-visible');revealObserver.unobserve(entry.target)}
 }),{threshold:.08}):null;
 function observeScrollReveal(){
+  if((root.querySelector('.analysis-layout')||root.querySelector('#analysisForm'))&&!root.querySelector('.awareness-dock'))root.insertAdjacentHTML('beforeend',awarenessWidgetMarkup());
+  const resultRoot=document.getElementById('analysisResult');
+  const learning=state.analysis?.learning;
+  if(resultRoot&&learning?.sample_id&&!resultRoot.querySelector('.learning-panel')){
+    resultRoot.insertAdjacentHTML('beforeend',learningPanelMarkup(learning));
+    refreshLearningSummary();
+  }
   if(!revealObserver)return;
   root.querySelectorAll(':scope > *:not(.scroll-reveal)').forEach(element=>{
     element.classList.add('scroll-reveal');
     revealObserver.observe(element);
   });
 }
-if('MutationObserver'in window)new MutationObserver(observeScrollReveal).observe(root,{childList:true});
+if('MutationObserver'in window)new MutationObserver(observeScrollReveal).observe(root,{childList:true,subtree:true});
 observeScrollReveal();
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const human=value=>String(value??'—').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -31,8 +50,54 @@ const shortId=value=>value?String(value).slice(0,8).toUpperCase():'—';
 const fmtTime=value=>{if(!value)return'—';const d=new Date(value);return Number.isNaN(+d)?escapeHtml(value):d.toLocaleString([], {month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'})};
 const severityColor={critical:'#fa777d',high:'#f17b78',medium:'#e9b85f',low:'#56dfae'};
 const endpoint=async(path,options={})=>{const response=await fetch(`${window.CYBERGUARD_API_BASE||''}${path}`,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});let data;try{data=await response.json()}catch{throw new Error('The analysis service returned an unreadable response.')}if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);return data};
+function chooseAwarenessTip(){let previous=awarenessIndex;if(previous<0){try{previous=Number(localStorage.getItem('cyberguard-awareness-tip'))}catch{previous=-1}}let index=Math.floor(Math.random()*awarenessTips.length);if(awarenessTips.length>1&&index===previous)index=(index+1)%awarenessTips.length;awarenessIndex=index;try{localStorage.setItem('cyberguard-awareness-tip',String(index))}catch{}return awarenessTips[index]}
+function awarenessWidgetMarkup(){const tip=chooseAwarenessTip();return `<aside class="awareness-dock" aria-label="Cyber safety awareness tip"><div class="awareness-sticker" id="awarenessSticker" aria-hidden="true">${tip.sticker}</div><div class="awareness-doodle awareness-doodle-shield" aria-hidden="true"><svg viewBox="0 0 64 72" fill="none"><path d="M32 4 55 13v19c0 16-9 27-23 36C18 59 9 48 9 32V13L32 4Z" stroke="currentColor" stroke-width="2.5"/><path d="m21 34 7 7 15-17" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="53" cy="8" r="2" fill="currentColor"/></svg></div><div class="awareness-kicker"><span class="awareness-spark" aria-hidden="true">✳</span> FIELD NOTE <span class="awareness-count" id="awarenessCount">${String(awarenessIndex+1).padStart(2,'0')} / ${String(awarenessTips.length).padStart(2,'0')}</span></div><h2 class="awareness-title" id="awarenessTitle">${tip.category}</h2><p class="awareness-copy" id="awarenessCopy">${tip.text}</p><button class="awareness-next" type="button" data-action="next-awareness" aria-label="Show another cyber safety tip">Another tip <span aria-hidden="true">↗</span></button><span class="awareness-doodle awareness-doodle-star" aria-hidden="true">✦</span></aside>`}
+function rotateAwarenessTip(){const tip=chooseAwarenessTip();const title=document.getElementById('awarenessTitle');const copy=document.getElementById('awarenessCopy');const count=document.getElementById('awarenessCount');const sticker=document.getElementById('awarenessSticker');if(!title||!copy||!count||!sticker)return;title.textContent=tip.category;copy.textContent=tip.text;sticker.textContent=tip.sticker;count.textContent=`${String(awarenessIndex+1).padStart(2,'0')} / ${String(awarenessTips.length).padStart(2,'0')}`}
+function learningPanelMarkup(learning){const modality=learning.modality;const authenticLabel=modality==='audio'?'Human voice':'Authentic';const syntheticLabel=modality==='audio'?'AI-generated voice':'Synthetic';return `<section class="panel learning-panel" aria-label="Review this example for local model learning"><div class="panel-head"><div><div class="panel-title">Local learning memory</div><div class="panel-subtitle">FEATURES ONLY · AWAITING YOUR VERIFIED LABEL</div></div><span class="tag medium">NOT YET LEARNED</span></div><div class="panel-body"><p class="learning-copy">This analysis saved numeric ${escapeHtml(modality)} features on this device only—not the original file or its contents. The model will not learn from its own prediction; confirm the real-world label to include this example.</p><label class="field-label" for="learningGroup">SOURCE GROUP · REUSE FOR RELATED EXAMPLES</label><input id="learningGroup" class="field learning-group" maxlength="200" placeholder="e.g. speaker-04 or source-set-02" autocomplete="off"><div class="learning-actions"><button class="button ghost small" type="button" data-learning-label="authentic">${escapeHtml(authenticLabel)}</button><button class="button ghost small" type="button" data-learning-label="synthetic">${escapeHtml(syntheticLabel)}</button></div><div class="learning-status" id="learningStatus" role="status">Use a consistent pseudonymous group for samples from the same speaker, source, or series. Training needs at least 20 confirmed examples per label across 8 distinct groups.</div><div class="learning-counts" id="learningCounts">Loading local memory totals…</div><button class="learning-clear" type="button" data-learning-clear>Clear saved examples</button><span class="learning-clear-note">Clearing removes saved examples; any already-promoted model remains active.</span></div></section>`}
+async function refreshLearningSummary(){const target=document.getElementById('learningCounts');if(!target)return;try{const data=await endpoint('/api/learning');const counts=data.examples?.[state.analysis?.learning?.modality]||{};target.textContent=`${counts.authentic||0} authentic · ${counts.synthetic||0} synthetic · ${counts.groups||0} source groups · ${counts.pending||0} awaiting review`}catch(error){target.textContent=`Could not load local memory totals: ${error.message}`}}
+document.addEventListener('click',async event=>{
+  const labelButton=event.target.closest('[data-learning-label]');
+  if(labelButton){
+    const learning=state.analysis?.learning;
+    const group=document.getElementById('learningGroup')?.value.trim();
+    const status=document.getElementById('learningStatus');
+    if(!learning?.sample_id||!status)return;
+    if(!group){status.textContent='Enter a pseudonymous source group before confirming the label.';document.getElementById('learningGroup')?.focus();return}
+    const buttons=document.querySelectorAll('[data-learning-label]');
+    buttons.forEach(button=>button.disabled=true);
+    status.textContent='Saving verified label and checking whether the reviewed set can safely improve the model…';
+    try{
+      const response=await endpoint(`/api/learning/${encodeURIComponent(learning.sample_id)}/label`,{method:'PATCH',body:JSON.stringify({label:labelButton.dataset.learningLabel,group_id:group})});
+      const training=response.training||{};
+      state.analysis.learning.status='reviewed';
+      status.textContent=training.message||'Label saved to local reviewed memory.';
+      const panel=labelButton.closest('.learning-panel');
+      panel?.querySelectorAll('[data-learning-label]').forEach(button=>button.remove());
+      const badge=panel?.querySelector('.tag');
+      if(badge){badge.className='tag low';badge.textContent='REVIEWED'}
+      if(training.promoted)toast('Reviewed examples improved the held-out score; the local model was updated.');
+      else if(training.status==='not_improved')toast('Feedback saved. The active model was kept because the candidate did not pass the improvement check.');
+      await refreshLearningSummary();
+    }catch(error){
+      status.textContent=`Could not save this review: ${error.message}`;
+      buttons.forEach(button=>button.disabled=false);
+    }
+    return;
+  }
+  if(event.target.closest('[data-learning-clear]')){
+    if(!window.confirm('Clear all locally saved learning examples? Any promoted model will remain active.'))return;
+    const status=document.getElementById('learningStatus');
+    try{
+      await endpoint('/api/learning',{method:'DELETE'});
+      if(status)status.textContent='Saved examples cleared from local memory. The active model was not removed.';
+      document.querySelectorAll('.learning-panel [data-learning-label]').forEach(button=>button.disabled=true);
+      await refreshLearningSummary();
+    }catch(error){if(status)status.textContent=`Could not clear local memory: ${error.message}`}
+  }
+});
+document.addEventListener('click',event=>{if(event.target.closest('[data-action="next-awareness"]'))rotateAwarenessTip()});
 function toast(message){const el=document.getElementById('toast');el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600)}
-function setView(view){state.view=view;state.analysis=null;state.demoMode=null;document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));document.getElementById('pageLabel').textContent={dashboard:'Overview',analysis:'New analysis',incidents:'Incident queue'}[view]||'Overview';render()}
+function setView(view){stopLiveVoice();state.view=view;state.analysis=null;state.demoMode=null;document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));document.getElementById('pageLabel').textContent={dashboard:'Overview',analysis:'New analysis',incidents:'Incident queue'}[view]||'Overview';render()}
 function heading(eyebrow,title,description,action=''){return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${description}</p></div>${action}</div>`}
 function severityTag(value){const key=String(value||'low').toLowerCase();return `<span class="tag ${escapeHtml(key)}">${escapeHtml(key.toUpperCase())}</span>`}
 function incidentContext(incident){const input=incident.input_summary||{};return [human(input.type||'Analysis'),input.sender,input.subject,input.target,input.filename].filter(Boolean).join(' · ')}
@@ -53,10 +118,11 @@ function analysisForm(){const kind=state.analysisKind;const tabs=[['email','Emai
   "failed_attempts": 7,
   "successful_login": true
 }</textarea></div><div class="form-note">Use authorized events only. User identifiers and history are not enriched.</div>`;else fields=`<div class="field-wrap"><label class="field-label">${kind.toUpperCase()} MEDIA</label><div class="upload-zone"><div style="margin-bottom:10px">Choose a file for actual local metadata assessment</div><input id="mediaFile" type="file" required accept="${kind==='image'?'image/*':kind==='audio'?'audio/*':'video/*'}"><div id="uploadName" class="upload-name">${kind.toUpperCase()} · MAX 100 MiB</div></div></div><div class="limitation">Media metadata is not proof of a deepfake. Inconclusive results will explicitly state that manipulation cannot be determined from available evidence.</div>`;
+  if(['image','audio','video'].includes(kind))fields+=`<div class="learning-disclosure">After analysis, numeric media features are stored locally for optional review-based learning. Original files are not retained; demos and live microphone windows are not added to memory.</div>`;
   return `<section class="panel form-panel"><div class="tabs">${tabs.map(([key,label])=>`<button type="button" class="tab ${kind===key?'active':''}" data-kind="${key}">${label}</button>`).join('')}</div><form id="analysisForm">${fields}<div class="form-note">Asset sensitivity is automatically inferred from inspectable content. Media that cannot be inspected for sensitive contents defaults to medium.</div><button class="button" id="submitAnalysis" type="submit">Analyze with CYBERGUARD&nbsp; →</button></form></section>`}
 function demoPrefillNotice(){return state.demoMode?`<div class="demo-prefill-notice" role="status">SYNTHETIC DEMO INPUT · ${escapeHtml(state.demoMode.label)} · NOT A REAL INCIDENT</div>`:''}
-function renderAnalysis(){root.innerHTML=`${heading('DETECTOR WORKSPACE','New analysis','Submit an authorized artifact or event. Every result is produced by the live backend.',`<button class="button ghost" type="button" data-action="toggle-demos" aria-expanded="false">▷ &nbsp;Demo scenarios</button>`)}
-  ${demoPickerMarkup()}${demoPrefillNotice()}<div class="analysis-layout"><div>${analysisForm()}<div class="demo-disclaimer" style="margin-top:12px"><b style="color:#c9d7de">DATA HANDLING</b><br>Media uploads are held in a temporary local file for analysis and deleted afterward. Demo inputs are synthetic and excluded from the incident queue and dashboard totals.</div></div><div><div class="pipeline-caption">END-TO-END ANALYSIS CHAIN</div>${pipelineMarkup()}<div id="analysisResult">${state.analysis?resultMarkup(state.analysis):`<div class="result-placeholder"><strong>Awaiting an analysis</strong>Choose an input type and submit it to see real detector output, evidence, fusion, risk, explanation, and advisory response.</div>`}</div></div></div>`}
+function renderAnalysis(){stopLiveVoice();root.innerHTML=`${heading('DETECTOR WORKSPACE','New analysis','Submit an authorized artifact or event. Every result is produced by the live backend.',`<button class="button ghost" type="button" data-action="toggle-demos" aria-expanded="false">▷ &nbsp;Demo scenarios</button>`)}
+  ${demoPickerMarkup()}${demoPrefillNotice()}<div class="analysis-layout"><div>${liveVoiceMarkup()}${analysisForm()}<div class="demo-disclaimer" style="margin-top:12px"><b style="color:#c9d7de">DATA HANDLING</b><br>Media uploads are held in a temporary local file for analysis and deleted afterward. Demo inputs are synthetic and excluded from the incident queue and dashboard totals.</div></div><div><div class="pipeline-caption">END-TO-END ANALYSIS CHAIN</div>${pipelineMarkup()}<div id="analysisResult">${state.analysis?resultMarkup(state.analysis):`<div class="result-placeholder"><strong>Awaiting an analysis</strong>Choose an input type and submit it to see real detector output, evidence, fusion, risk, explanation, and advisory response.</div>`}</div></div></div>`}
 function pipelineMarkup(){const steps=['INPUT','AI/ML DETECTORS','SECURITY RULES','EVIDENCE','THREAT FUSION','RISK SCORE','EXPLANATION','RESPONSE'];return `<div class="pipeline">${steps.map((s,i)=>`${i?'<span class="pipe-arrow"></span>':''}<div class="pipe-step ${state.analysis?'done':''}"><span class="pipe-num">${state.analysis?'✓':String(i+1).padStart(2,'0')}</span>${s}</div>`).join('')}</div>`}
 function riskLabel(item){const name=item.factor;const names={credential_request:'Credential request',suspicious_url:'Suspicious URL',detector_agreement:'Independent detector agreement',domain_anomaly:'Sender domain anomaly',urgency:'Urgency language',url_presence:'URL present',financial_request:'Financial request',impersonation_language:'Impersonation language',attachment_indicator:'Attachment indicator',repeated_failures:'Repeated login failures',successful_login_after_failures:'Success after repeated failures',unusual_hour_indicator:'Unusual login hour',isolation_forest_outlier:'Isolation Forest outlier',identity_claim_inconsistent:'Identity claim inconsistent',high_risk_request:'High-risk request',abnormal_context:'Abnormal context',independent_verification_absent:'Independent verification absent',manipulation_model_indicator:'Manipulation model indicator',asset_sensitivity:'Asset sensitivity',threat_base:'Threat category baseline'};return names[name]||human(name)}
 function evidenceMarkup(items){if(!items?.length)return '<div class="empty-state" style="padding:12px">No evidence items were reported by the detectors.</div>';return items.map(e=>`<div class="evidence-card"><div class="evidence-indicator">${escapeHtml(human(e.indicator||e.type||'Evidence item'))}</div><div class="evidence-detail">${escapeHtml(e.detector||'')} · ${escapeHtml(typeof e.value==='object'?JSON.stringify(e.value):e.value??e.type??'Indicator observed')}</div></div>`).join('')}
@@ -332,12 +398,13 @@ analysisForm=function(){
 };
 const standardRenderAnalysis=renderAnalysis;
 renderAnalysis=function(){
+  stopLiveVoice();
   if(state.analysisKind!=='email'){
     standardRenderAnalysis();
     root.querySelector('.tabs [data-kind="message"]')?.remove();
     return;
   }
-  root.innerHTML=`${heading('EMAIL SECURITY','Analyze an email','Paste it once. Sender, organization and role clues, likely objective, and links are extracted automatically.',`<button class="button ghost" type="button" data-action="toggle-demos" aria-expanded="false">▷ &nbsp;Demo scenarios</button>`)}${demoPickerMarkup()}${demoPrefillNotice()}${analysisForm()}<div id="analysisResult">${state.analysis?resultMarkup(state.analysis):'<div class="email-empty">Your analysis summary will appear here.</div>'}</div>`;
+  root.innerHTML=`${heading('EMAIL SECURITY','Analyze an email','Paste it once. Sender, organization and role clues, likely objective, and links are extracted automatically.',`<button class="button ghost" type="button" data-action="toggle-demos" aria-expanded="false">▷ &nbsp;Demo scenarios</button>`)}${demoPickerMarkup()}${demoPrefillNotice()}${liveVoiceMarkup()}${analysisForm()}<div id="analysisResult">${state.analysis?resultMarkup(state.analysis):'<div class="email-empty">Your analysis summary will appear here.</div>'}</div>`;
 };
 resultMarkup=function(result){
   const detected=result.input&&result.input.auto_detected;
@@ -389,4 +456,173 @@ document.addEventListener('submit',async event=>{
     button.textContent='Analyze with CYBERGUARD →';
   }
 },true);
+function liveVoiceMarkup(){
+  return `<section class="panel live-voice-panel"><div class="panel-head"><div><div class="panel-title">Live microphone voice check</div><div class="panel-subtitle">LOCAL · FIVE-SECOND WINDOWS · NO INCIDENTS SAVED</div></div><span class="live-voice-indicator" aria-hidden="true"></span></div><div class="panel-body"><label class="field-label" for="liveVoiceDevice">MICROPHONE INPUT</label><div class="live-voice-device"><select class="field" id="liveVoiceDevice"><option value="">Default microphone</option></select><button class="button ghost small" type="button" data-action="refresh-live-voice-devices">Find microphones</button></div><div class="live-voice-actions"><button class="button" type="button" data-action="start-live-voice">🎙 Start live check</button><button class="button ghost" type="button" data-action="stop-live-voice" disabled>Stop</button><span id="liveVoiceStatus" role="status">Microphone is off.</span></div><div id="liveVoiceResult" class="live-voice-result"><strong>Ready when you are</strong><span>Select a laptop or connected microphone, then start. The latest result updates after each speech window.</span></div><p class="live-voice-note">Uses browser echo cancellation, noise suppression, and automatic gain control when supported. Background noise, codecs, and speaking style can still cause mistakes; low-quality audio is reported as inconclusive. This detector is not validated for call-grade or noisy-environment accuracy. Audio is analyzed locally and discarded after each window.</p></div></section>`;
+}
+function setLiveVoiceStatus(message){
+  const status=document.getElementById('liveVoiceStatus');
+  if(status)status.textContent=message;
+}
+function liveVoiceLabel(value){
+  return ({likely_human:'Likely human',likely_ai_generated:'Likely AI-generated',inconclusive:'Inconclusive'})[value]||'Inconclusive';
+}
+function stopLiveVoice(){
+  liveVoice.session+=1;
+  if(liveVoice.interval){clearInterval(liveVoice.interval);liveVoice.interval=null}
+  if(liveVoice.processor){liveVoice.processor.onaudioprocess=null;liveVoice.processor.disconnect();liveVoice.processor=null}
+  if(liveVoice.mute){liveVoice.mute.disconnect();liveVoice.mute=null}
+  if(liveVoice.stream){liveVoice.stream.getTracks().forEach(track=>track.stop());liveVoice.stream=null}
+  if(liveVoice.context){const context=liveVoice.context;liveVoice.context=null;if(context.state!=='closed')context.close().catch(()=>{})}
+  liveVoice.chunks=[];
+  liveVoice.samples=0;
+  liveVoice.busy=false;
+  const start=document.querySelector('[data-action="start-live-voice"]');
+  const stop=document.querySelector('[data-action="stop-live-voice"]');
+  const device=document.getElementById('liveVoiceDevice');
+  if(start)start.disabled=false;
+  if(stop)stop.disabled=true;
+  if(device)device.disabled=false;
+  if(document.getElementById('liveVoiceStatus'))setLiveVoiceStatus('Microphone is off.');
+}
+function encodeLiveVoiceWav(chunks,sampleCount,sourceRate){
+  const source=new Float32Array(sampleCount);
+  let offset=0;
+  for(const chunk of chunks){source.set(chunk,offset);offset+=chunk.length}
+  const targetRate=16000;
+  const targetCount=Math.floor(source.length*targetRate/sourceRate);
+  if(targetCount<targetRate*3)throw new Error('Wait for at least three seconds of speech before analyzing.');
+  const pcm=new ArrayBuffer(44+targetCount*2);
+  const view=new DataView(pcm);
+  const write=(position,text)=>{for(let i=0;i<text.length;i++)view.setUint8(position+i,text.charCodeAt(i))};
+  write(0,'RIFF');view.setUint32(4,36+targetCount*2,true);write(8,'WAVE');write(12,'fmt ');
+  view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+  view.setUint32(24,targetRate,true);view.setUint32(28,targetRate*2,true);
+  view.setUint16(32,2,true);view.setUint16(34,16,true);write(36,'data');view.setUint32(40,targetCount*2,true);
+  for(let i=0;i<targetCount;i++){
+    const position=i*sourceRate/targetRate;
+    const left=Math.floor(position),right=Math.min(left+1,source.length-1),fraction=position-left;
+    const sample=Math.max(-1,Math.min(1,source[left]*(1-fraction)+source[right]*fraction));
+    view.setInt16(44+i*2,sample<0?sample*32768:sample*32767,true);
+  }
+  let binary='';
+  const bytes=new Uint8Array(pcm);
+  for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+8192,bytes.length)));
+  return btoa(binary);
+}
+function appendLiveVoiceResult(result){
+  const output=document.getElementById('liveVoiceResult');
+  if(!output)return;
+  const origin=result.voice_origin||{};
+  const quality=result.audio_quality||{};
+  const label=liveVoiceLabel(result.classification);
+  const method=result.detector_method==='ml'?'LOCAL TRAINED MODEL':'ACOUSTIC HEURISTIC';
+  const warnings=quality.warnings?.length?quality.warnings.map(escapeHtml).join('<br>'):'Audio level and speech activity were sufficient for this window.';
+  output.innerHTML=`<div class="live-voice-result-head"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(method)} · NO CONFIDENCE SCORE</span></div><div>${escapeHtml(warnings)}</div><small>Window ${liveVoice.windows} · ${quality.duration_seconds??'—'} s · ${quality.signal_level_dbfs??'—'} dBFS · ${quality.usable?'usable capture':'quality check failed'}</small>${origin.limitations?.length?`<small>${origin.limitations.map(escapeHtml).join(' ')}</small>`:''}`;
+}
+async function analyzeLiveVoiceWindow(){
+  if(liveVoice.busy||!liveVoice.context||liveVoice.samples<liveVoice.context.sampleRate*5)return;
+  const session=liveVoice.session;
+  liveVoice.busy=true;
+  const sourceRate=liveVoice.context.sampleRate;
+  const chunks=liveVoice.chunks;
+  const sampleCount=liveVoice.samples;
+  liveVoice.chunks=[];
+  liveVoice.samples=0;
+  try{
+    const content_base64=encodeLiveVoiceWav(chunks,sampleCount,sourceRate);
+    setLiveVoiceStatus('Analyzing the latest microphone window…');
+    const result=await endpoint('/api/live-voice',{method:'POST',body:JSON.stringify({content_base64})});
+    if(session!==liveVoice.session)return;
+    liveVoice.windows+=1;
+    appendLiveVoiceResult(result);
+    setLiveVoiceStatus('Listening · next result in about five seconds');
+  }catch(error){
+    if(session===liveVoice.session)setLiveVoiceStatus(error.message);
+  }finally{
+    if(session===liveVoice.session)liveVoice.busy=false;
+  }
+}
+async function refreshLiveVoiceDevices(){
+  let temporaryStream;
+  try{
+    temporaryStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const devices=await navigator.mediaDevices.enumerateDevices();
+    const select=document.getElementById('liveVoiceDevice');
+    if(!select)return;
+    const selected=select.value;
+    const microphones=devices.filter(device=>device.kind==='audioinput');
+    select.innerHTML='<option value="">Default microphone</option>'+microphones.map((device,index)=>`<option value="${escapeHtml(device.deviceId)}">${escapeHtml(device.label||`Microphone ${index+1}`)}</option>`).join('');
+    if(microphones.some(device=>device.deviceId===selected))select.value=selected;
+    setLiveVoiceStatus(`${microphones.length} microphone input(s) found.`);
+  }catch(error){
+    setLiveVoiceStatus(`Could not list microphones: ${error.message}`);
+  }finally{
+    temporaryStream?.getTracks().forEach(track=>track.stop());
+  }
+}
+async function startLiveVoice(){
+  if(!navigator.mediaDevices?.getUserMedia){setLiveVoiceStatus('This browser does not provide microphone capture. Use a current browser on localhost or HTTPS.');return}
+  const session=liveVoice.session+1;
+  liveVoice.session=session;
+  const start=document.querySelector('[data-action="start-live-voice"]');
+  const stop=document.querySelector('[data-action="stop-live-voice"]');
+  const device=document.getElementById('liveVoiceDevice');
+  if(start)start.disabled=true;
+  if(device)device.disabled=true;
+  try{
+    const deviceId=device?.value;
+    const audio={channelCount:{ideal:1},echoCancellation:true,noiseSuppression:true,autoGainControl:true};
+    if(deviceId)audio.deviceId={exact:deviceId};
+    liveVoice.stream=await navigator.mediaDevices.getUserMedia({audio});
+    if(session!==liveVoice.session){liveVoice.stream.getTracks().forEach(track=>track.stop());liveVoice.stream=null;return}
+    const devices=await navigator.mediaDevices.enumerateDevices();
+    if(device){
+      const selected=liveVoice.stream.getAudioTracks()[0]?.getSettings?.().deviceId||deviceId||'';
+      const microphones=devices.filter(item=>item.kind==='audioinput');
+      device.innerHTML='<option value="">Default microphone</option>'+microphones.map((item,index)=>`<option value="${escapeHtml(item.deviceId)}">${escapeHtml(item.label||`Microphone ${index+1}`)}</option>`).join('');
+      if(microphones.some(item=>item.deviceId===selected))device.value=selected;
+      device.disabled=true;
+    }
+    try{liveVoice.context=new AudioContext({sampleRate:16000})}
+    catch{liveVoice.context=new AudioContext()}
+    await liveVoice.context.resume();
+    const source=liveVoice.context.createMediaStreamSource(liveVoice.stream);
+    liveVoice.processor=liveVoice.context.createScriptProcessor(4096,1,1);
+    liveVoice.mute=liveVoice.context.createGain();
+    liveVoice.mute.gain.value=0;
+    liveVoice.processor.onaudioprocess=event=>{
+      if(!liveVoice.stream)return;
+      const input=event.inputBuffer.getChannelData(0);
+      const copy=new Float32Array(input);
+      liveVoice.chunks.push(copy);
+      liveVoice.samples+=copy.length;
+      while(liveVoice.samples>liveVoice.context.sampleRate*10&&liveVoice.chunks.length){
+        liveVoice.samples-=liveVoice.chunks.shift().length;
+      }
+    };
+    source.connect(liveVoice.processor);
+    liveVoice.processor.connect(liveVoice.mute);
+    liveVoice.mute.connect(liveVoice.context.destination);
+    liveVoice.windows=0;
+    liveVoice.interval=setInterval(analyzeLiveVoiceWindow,400);
+    if(start)start.disabled=true;
+    if(stop)stop.disabled=false;
+    setLiveVoiceStatus(`Listening through ${liveVoice.stream.getAudioTracks()[0]?.label||'selected microphone'}; analysis updates every ~5 seconds.`);
+    liveVoice.stream.getTracks().forEach(track=>track.addEventListener('ended',()=>{stopLiveVoice();setLiveVoiceStatus('Microphone disconnected.')} ,{once:true}));
+  }catch(error){
+    if(session!==liveVoice.session)return;
+    stopLiveVoice();
+    const message=error.message.includes('Request failed (404)')
+      ?'The dashboard server needs a restart to enable live microphone analysis. Restart it, reload this page, and try again.'
+      :`Could not start microphone: ${error.message}`;
+    setLiveVoiceStatus(message);
+  }
+}
+document.addEventListener('click',event=>{
+  const action=event.target.closest('[data-action]')?.dataset.action;
+  if(action==='start-live-voice')startLiveVoice();
+  if(action==='stop-live-voice')stopLiveVoice();
+  if(action==='refresh-live-voice-devices')refreshLiveVoiceDevices();
+});
+window.addEventListener('pagehide',stopLiveVoice);
 render();

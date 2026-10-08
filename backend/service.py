@@ -20,6 +20,7 @@ PHISHING_MODEL = ROOT / "models/phishing/model.joblib"
 LOGIN_MODEL = ROOT / "models/login/model.joblib"
 MEDIA_MODEL_DIR = ROOT / "models/media"
 DASHBOARD_DB = ROOT / "database/dashboard.sqlite3"
+LEARNING_DB = ROOT / "database/learning-memory.sqlite3"
 
 
 @lru_cache(maxsize=1)
@@ -54,6 +55,71 @@ def _init_metrics():
 
 def _add_evidence_result(detector_result):
     return detector_result.to_dict()
+
+
+def analyze_live_voice(payload: dict) -> dict:
+    """Analyze one short, temporary microphone window without storing an incident."""
+    if not isinstance(payload, dict):
+        raise ValueError("request must be a JSON object")
+    encoded = payload.get("content_base64")
+    if not isinstance(encoded, str) or not 1 <= len(encoded) <= 1_000_000:
+        raise ValueError("microphone window is missing or exceeds the 750 KiB limit")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (ValueError, base64.binascii.Error) as exc:
+        raise ValueError("microphone audio is not valid base64") from exc
+    if not raw or len(raw) > 750 * 1024:
+        raise ValueError("microphone window must be between 1 byte and 750 KiB")
+
+    from detectors.multimedia import analyze_audio
+
+    with tempfile.NamedTemporaryFile(prefix="cyberguard-live-voice-", suffix=".wav", delete=False) as stream:
+        temp_path = Path(stream.name)
+        stream.write(raw)
+    try:
+        detector = analyze_audio(temp_path, model=_media_model("audio"))
+        result = detector.to_dict()
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+    features = result.get("features", {})
+    origin = features.get("voice_origin") or {
+        "classification": "inconclusive",
+        "method": "unavailable",
+        "confidence": None,
+        "evidence": [],
+        "limitations": ["No voice-origin assessment was produced for this microphone window."],
+    }
+    quality_reasons = []
+    if features.get("duration_seconds", 0) < 3:
+        quality_reasons.append("At least 3 seconds of audio are required.")
+    if features.get("analysis_truncated"):
+        quality_reasons.append("Microphone windows longer than 10 seconds are not accepted.")
+    if features.get("signal_rms_dbfs", -100) < -48:
+        quality_reasons.append("The captured audio level is too low.")
+    if features.get("voiced_frame_ratio", 0) < 0.10:
+        quality_reasons.append("Not enough speech-like voiced frames were detected; speak clearly and try again.")
+    if features.get("clipped_sample_fraction", 0) > 0.05:
+        quality_reasons.append("The recording is clipping; reduce microphone gain or move farther from the microphone.")
+
+    classification = origin.get("classification", "inconclusive")
+    if result.get("classification") in {"inconclusive", "unsupported"} or quality_reasons:
+        classification = "inconclusive"
+    return {
+        "classification": classification,
+        "voice_origin": {**origin, "classification": classification},
+        "audio_quality": {
+            "duration_seconds": features.get("duration_seconds"),
+            "signal_level_dbfs": features.get("signal_rms_dbfs"),
+            "voiced_frame_ratio": features.get("voiced_frame_ratio"),
+            "clipped_sample_fraction": features.get("clipped_sample_fraction"),
+            "usable": not quality_reasons,
+            "warnings": quality_reasons,
+        },
+        "detector_method": result.get("method"),
+        "model_version": result.get("model_version"),
+        "confidence": None,
+    }
 
 
 def _detectors_for(payload: dict) -> tuple[list[dict], dict]:
@@ -280,6 +346,45 @@ def analyze_request(
     result["recommended_action"] = [x["action"] for x in result["response"]]
 
     if persist_incident:
+        media_type = input_details.get("media_type")
+        modality = "audio" if media_type == "voice" else media_type
+        if modality in {"audio", "image", "video"} and media_results:
+            media_result = media_results[0]
+            media_features = media_result.get("features", {})
+            prediction = None
+            voice_origin = media_features.get("voice_origin") or {}
+            if modality == "audio":
+                prediction = {
+                    "likely_human": "authentic",
+                    "likely_ai_generated": "synthetic",
+                }.get(voice_origin.get("classification"))
+                if media_features.get("duration_seconds", 0) < 3:
+                    prediction = None
+                if media_features.get("signal_rms_dbfs", -100) < -48:
+                    prediction = None
+                if media_features.get("voiced_frame_ratio", 0) < 0.10:
+                    prediction = None
+                if media_features.get("clipped_sample_fraction", 0) > 0.05:
+                    prediction = None
+            if prediction is None:
+                prediction = {
+                    "no_significant_indicators": "authentic",
+                    "suspicious": "synthetic",
+                    "manipulation_indicators_detected": "synthetic",
+                }.get(media_result.get("classification"))
+            if prediction is not None and media_result.get("method") != "feature_extraction_unavailable":
+                from backend.learning import save_pending_example
+
+                sample_id = save_pending_example(LEARNING_DB, modality, media_features, prediction)
+                if sample_id:
+                    result["learning"] = {
+                        "sample_id": sample_id,
+                        "status": "awaiting_review",
+                        "modality": modality,
+                        "raw_content_stored": False,
+                    }
+
+    if persist_incident:
         auto_detected = input_details.get("auto_detected", {})
         input_summary = {"type": payload.get("type", "email")}
         sender = auto_detected.get("sender") or input_details.get("sender") or payload.get("sender")
@@ -310,6 +415,46 @@ def analyze_request(
                        (result["created_at"], result["fusion"]["threat"], result["risk"]["severity"], processing_ms,
                         json.dumps([x["detector"] for x in detector_results]), incident.get("incident_id") if incident else None))
     return result
+
+
+def learning_memory_status() -> dict:
+    from backend.learning import learning_summary
+
+    return learning_summary(LEARNING_DB)
+
+
+def review_learning_sample(sample_id: str, label: str, group_id: str) -> dict:
+    from backend.learning import learning_summary, review_example, reviewed_examples
+    from training.media import train_reviewed_features
+
+    reviewed = review_example(LEARNING_DB, sample_id, label, group_id)
+    examples = reviewed_examples(LEARNING_DB, reviewed["modality"])
+    try:
+        training = train_reviewed_features(
+            reviewed["modality"],
+            examples,
+            MEDIA_MODEL_DIR,
+        )
+    except ValueError as exc:
+        training = {
+            "promoted": False,
+            "status": "not_evaluated",
+            "message": str(exc),
+        }
+    if training.get("promoted"):
+        _media_model.cache_clear()
+    return {
+        "reviewed": reviewed,
+        "training": training,
+        "memory": learning_summary(LEARNING_DB),
+    }
+
+
+def clear_learning_memory() -> dict:
+    from backend.learning import clear_learning_memory as clear_memory, learning_summary
+
+    clear_memory(LEARNING_DB)
+    return learning_summary(LEARNING_DB)
 
 
 def demo_fixture_data(demo_id: str) -> dict:

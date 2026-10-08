@@ -27,5 +27,6 @@ models/media/*.joblib
 models/media/*.registry.json
 database/incidents.sqlite3
 database/dashboard.sqlite3
+database/learning-memory.sqlite3
 database/*.sqlite3-shm
 database/*.sqlite3-wal

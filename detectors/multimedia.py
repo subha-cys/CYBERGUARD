@@ -20,7 +20,7 @@ from features.multimedia_audio import extract_audio_features
 from features.multimedia_image import extract_image_features
 from features.multimedia_video import extract_video_features
 
-DETECTOR_VERSION = "multimedia-authenticity-2.2.0"
+DETECTOR_VERSION = "multimedia-authenticity-2.3.0"
 MAX_FILE_BYTES = 100 * 1024 * 1024
 EPISTEMIC_LIMITATION = (
     "Classification is a statistical model prediction and does not represent definitive proof of manipulation. "

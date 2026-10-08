@@ -6,7 +6,17 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from backend.service import analyze_request, dashboard_data, demo_fixture_data, incident_data, set_incident_status
+from backend.service import (
+    analyze_live_voice,
+    analyze_request,
+    dashboard_data,
+    demo_fixture_data,
+    incident_data,
+    learning_memory_status,
+    review_learning_sample,
+    clear_learning_memory,
+    set_incident_status,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
@@ -54,6 +64,11 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/multimedia-config":
             from config.multimedia_config import get_multimedia_config, check_system_capabilities
             return self._json(200, {"config": get_multimedia_config(), "capabilities": check_system_capabilities()})
+        if parsed.path == "/api/learning":
+            try:
+                return self._json(200, learning_memory_status())
+            except Exception as exc:
+                return self._json(500, {"error": str(exc)})
         if parsed.path == "/api/health":
             return self._json(200, {"status": "ok", "application": "CYBERGUARD Intelligence Dashboard"})
         if parsed.path.startswith("/api/demo-fixture/"):
@@ -79,6 +94,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     payload,
                     persist_incident=False,
                 ))
+            if self.path == "/api/live-voice":
+                return self._json(200, analyze_live_voice(payload))
             if self.path == "/api/multimedia-config":
                 from config.multimedia_config import update_multimedia_config
                 return self._json(200, update_multimedia_config(payload))
@@ -91,6 +108,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def do_PATCH(self):
         try:
             parts = [unquote(x) for x in urlparse(self.path).path.split("/") if x]
+            if len(parts) == 4 and parts[:2] == ["api", "learning"] and parts[3] == "label":
+                payload = self._body()
+                result = review_learning_sample(
+                    parts[2],
+                    payload.get("label"),
+                    payload.get("group_id"),
+                )
+                return self._json(200, result)
             if len(parts) != 4 or parts[:2] != ["api", "incidents"] or parts[3] != "status":
                 return self._json(404, {"error": "API endpoint not found"})
             payload = self._body()
@@ -98,6 +123,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return self._json(200, incident)
         except (ValueError, KeyError) as exc:
             return self._json(400, {"error": str(exc)})
+        except Exception as exc:
+            return self._json(500, {"error": str(exc)})
+
+    def do_DELETE(self):
+        if urlparse(self.path).path != "/api/learning":
+            return self._json(404, {"error": "API endpoint not found"})
+        try:
+            return self._json(200, clear_learning_memory())
         except Exception as exc:
             return self._json(500, {"error": str(exc)})
 

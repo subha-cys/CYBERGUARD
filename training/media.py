@@ -29,7 +29,7 @@ LABEL_MAP = {
     "ai_generated": "synthetic",
     "synthetic": "synthetic",
 }
-FEATURE_VERSION = "multimedia-numeric-features-1.0.0"
+FEATURE_VERSION = "multimedia-numeric-features-1.1.0"
 MAX_MEDIA_BYTES = 100 * 1024 * 1024
 
 
@@ -206,7 +206,7 @@ def train_and_evaluate(
                      pos_label="synthetic", zero_division=0),
             precision_score(y[validation], np.where(validation_scores >= candidate, "synthetic", "authentic"),
                             pos_label="synthetic", zero_division=0),
-            candidate,
+            -candidate,
         ),
     )
     test_scores = pipeline.predict_proba(x[test])[:, synthetic_index]
@@ -270,6 +270,196 @@ def train_and_evaluate(
         if temp_registry is not None:
             temp_registry.unlink(missing_ok=True)
     return registry
+
+
+def train_reviewed_features(
+    modality: str,
+    examples: list[dict[str, Any]],
+    output_dir: str | Path,
+    *,
+    seed: int = 42,
+) -> dict[str, Any]:
+    """Retrain from confirmed local memory and promote only on held-out improvement."""
+    if modality not in {"image", "audio", "video"}:
+        raise ValueError("modality must be image, audio, or video")
+    if not examples:
+        raise ValueError("there are no human-reviewed learning examples")
+
+    rows: list[list[float]] = []
+    labels: list[str] = []
+    groups: list[str] = []
+    predictions: list[str] = []
+    feature_names: list[str] | None = None
+    digest = hashlib.sha256()
+    for example in examples:
+        if example.get("feature_version") != FEATURE_VERSION:
+            raise ValueError("learning memory uses a different feature version; clear it and collect fresh examples")
+        label = example.get("label")
+        group = example.get("group_id")
+        prediction = example.get("original_prediction")
+        if label not in LABELS or not isinstance(group, str) or not group.strip():
+            raise ValueError("each reviewed example needs an authentic/synthetic label and source group")
+        if prediction not in LABELS:
+            raise ValueError("learning memory contains an unsupported original prediction")
+        current_names, vector = _numeric_features(example.get("features", {}), feature_names)
+        if feature_names is not None and current_names != feature_names:
+            raise ValueError("reviewed examples have mismatched numeric feature schemas")
+        feature_names = current_names
+        rows.append(vector)
+        labels.append(label)
+        groups.append(group)
+        predictions.append(prediction)
+        digest.update(
+            json.dumps(
+                [example.get("sample_id"), label, group, current_names, vector],
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        )
+
+    counts = Counter(labels)
+    if len(rows) < 40 or min((counts[label] for label in LABELS), default=0) < 20:
+        return {
+            "promoted": False,
+            "status": "collecting",
+            "message": "Training needs 40 reviewed examples, with at least 20 per label.",
+            "reviewed_count": len(rows),
+            "class_counts": dict(counts),
+        }
+    if len(set(groups)) < 8:
+        return {
+            "promoted": False,
+            "status": "collecting",
+            "message": "Training needs at least 8 distinct source groups.",
+            "reviewed_count": len(rows),
+            "class_counts": dict(counts),
+            "source_group_count": len(set(groups)),
+        }
+
+    x = np.asarray(rows, dtype=np.float64)
+    y = np.asarray(labels)
+    train, validation, test = _group_splits(labels, groups, seed)
+    pipeline = Pipeline([
+        ("impute", SimpleImputer(strategy="median")),
+        ("scale", StandardScaler()),
+        ("classifier", LogisticRegression(max_iter=2000, class_weight="balanced", random_state=seed)),
+    ])
+    pipeline.fit(x[train], y[train])
+    classes = list(pipeline.named_steps["classifier"].classes_)
+    synthetic_index = classes.index("synthetic")
+    validation_scores = pipeline.predict_proba(x[validation])[:, synthetic_index]
+    thresholds = np.linspace(0.05, 0.95, 91)
+    threshold = max(
+        thresholds,
+        key=lambda candidate: (
+            f1_score(
+                y[validation],
+                np.where(validation_scores >= candidate, "synthetic", "authentic"),
+                pos_label="synthetic",
+                zero_division=0,
+            ),
+            precision_score(
+                y[validation],
+                np.where(validation_scores >= candidate, "synthetic", "authentic"),
+                pos_label="synthetic",
+                zero_division=0,
+            ),
+            -candidate,
+        ),
+    )
+    test_scores = pipeline.predict_proba(x[test])[:, synthetic_index]
+    test_metrics = _metrics(y[test], test_scores, float(threshold))
+    baseline_scores = np.asarray(
+        [1.0 if predictions[index] == "synthetic" else 0.0 for index in test],
+        dtype=np.float64,
+    )
+    baseline_metrics = _metrics(y[test], baseline_scores, 0.5)
+    group_sets = {
+        "train": set(np.asarray(groups)[train]),
+        "validation": set(np.asarray(groups)[validation]),
+        "test": set(np.asarray(groups)[test]),
+    }
+    promoted = (
+        test_metrics["f1_synthetic"] > baseline_metrics["f1_synthetic"]
+        and test_metrics["false_positive_rate"] <= baseline_metrics["false_positive_rate"]
+    )
+    registry = {
+        "model_name": f"{modality}_reviewed_memory_baseline",
+        "model_version": f"{modality}-reviewed-memory-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+        "modality": modality,
+        "feature_version": FEATURE_VERSION,
+        "feature_names": feature_names,
+        "dataset_sha256": digest.hexdigest(),
+        "label_mapping": LABEL_MAP,
+        "training_timestamp": datetime.now(timezone.utc).isoformat(),
+        "algorithm": "median imputation, standard scaling, class-balanced logistic regression",
+        "training_source": "locally reviewed feature-only analysis memory",
+        "threshold_selection": "maximum synthetic-class F1 on a group-separated validation partition",
+        "threshold": float(threshold),
+        "validation_metrics_at_threshold": _metrics(y[validation], validation_scores, float(threshold)),
+        "held_out_test_metrics": test_metrics,
+        "previous_assessment_test_metrics": baseline_metrics,
+        "promotion_gate": (
+            "held-out F1 must improve over the saved original assessment and false-positive rate must not increase"
+        ),
+        "promoted": promoted,
+        "class_counts": dict(counts),
+        "split_group_counts": {name: len(values) for name, values in group_sets.items()},
+        "group_leakage_check_passed": not (
+            group_sets["train"] & group_sets["validation"]
+            or group_sets["train"] & group_sets["test"]
+            or group_sets["validation"] & group_sets["test"]
+        ),
+        "probabilities_calibrated": False,
+        "limitations": [
+            "This is a feature-based baseline, not a universal deepfake detector.",
+            "Model scores are uncalibrated and are not probabilities or confidence.",
+            "Held-out metrics describe only reviewed local examples and do not establish external generalization.",
+            "Each promoted candidate improved on the saved original assessments in its group-separated test split; this is not a guarantee of future performance.",
+        ],
+        "random_seed": seed,
+    }
+    if promoted:
+        destination = Path(output_dir)
+        destination.mkdir(parents=True, exist_ok=True)
+        artifact = destination / f"{modality}.joblib"
+        registry_path = destination / f"{modality}.registry.json"
+        temp_artifact: Path | None = None
+        temp_registry: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix=f".{modality}-memory-", suffix=".joblib", dir=destination, delete=False
+            ) as stream:
+                temp_artifact = Path(stream.name)
+            joblib.dump({"pipeline": pipeline, "registry": registry}, temp_artifact)
+            with tempfile.NamedTemporaryFile(
+                prefix=f".{modality}-memory-",
+                suffix=".json",
+                mode="w",
+                encoding="utf-8",
+                dir=destination,
+                delete=False,
+            ) as stream:
+                temp_registry = Path(stream.name)
+                json.dump(registry, stream, indent=2)
+                stream.write("\n")
+            temp_artifact.replace(artifact)
+            temp_registry.replace(registry_path)
+        finally:
+            if temp_artifact is not None:
+                temp_artifact.unlink(missing_ok=True)
+            if temp_registry is not None:
+                temp_registry.unlink(missing_ok=True)
+    return {
+        "promoted": promoted,
+        "status": "promoted" if promoted else "not_improved",
+        "message": (
+            "Reviewed model promoted after improving held-out F1 without increasing false positives."
+            if promoted
+            else "Candidate did not improve held-out F1 while keeping false positives at or below the previous assessment; the active model was left unchanged."
+        ),
+        "registry": registry,
+    }
 
 
 def main(argv: list[str] | None = None) -> None:

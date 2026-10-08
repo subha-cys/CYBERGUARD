@@ -153,9 +153,12 @@ def _compute_pitch_and_microvariation(samples: np.ndarray, sr: int) -> dict[str,
 
     pitches = []
     amplitudes = []
+    frame_count = 0
+    voiced_frame_count = 0
 
     for start in range(0, len(samples) - frame_len, hop_len):
         frame = samples[start:start + frame_len]
+        frame_count += 1
         energy = np.sum(frame ** 2)
         if energy < 0.001:
             continue
@@ -173,6 +176,7 @@ def _compute_pitch_and_microvariation(samples: np.ndarray, sr: int) -> dict[str,
                 f0 = sr / peak_lag
                 pitches.append(f0)
                 amplitudes.append(float(np.max(np.abs(frame))))
+                voiced_frame_count += 1
 
     if len(pitches) >= 5:
         pitch_arr = np.array(pitches)
@@ -199,6 +203,7 @@ def _compute_pitch_and_microvariation(samples: np.ndarray, sr: int) -> dict[str,
         "f0_std_hz": round(f0_std, 2),
         "vocal_jitter": round(jitter, 5),
         "vocal_shimmer": round(shimmer, 5),
+        "voiced_frame_ratio": round(voiced_frame_count / max(1, frame_count), 4),
     }
 
 
@@ -236,6 +241,9 @@ def extract_audio_features(audio_input: str | Path | bytes) -> dict[str, Any]:
     spectral_res = _compute_spectral_features(samples, sr)
     pitch_res = _compute_pitch_and_microvariation(samples, sr)
     silence_res = _compute_silence_and_continuity(samples, sr)
+    rms = float(np.sqrt(np.mean(samples ** 2)))
+    peak = float(np.max(np.abs(samples)))
+    clipped_fraction = float(np.mean(np.abs(samples) >= 0.999))
 
     return {
         "sample_rate_hz": sr,
@@ -243,6 +251,9 @@ def extract_audio_features(audio_input: str | Path | bytes) -> dict[str, Any]:
         "analyzed_duration_seconds": analyzed_duration,
         "analysis_truncated": source_sample_count > len(samples),
         "sample_count": len(samples),
+        "signal_rms_dbfs": round(20 * math.log10(max(rms, 1e-8)), 2),
+        "peak_dbfs": round(20 * math.log10(max(peak, 1e-8)), 2),
+        "clipped_sample_fraction": round(clipped_fraction, 5),
         **spectral_res,
         **pitch_res,
         **silence_res,
