@@ -8,6 +8,7 @@ def explain(fusion: dict, risk: dict, recommendations: list[dict]) -> dict:
         "suspicious_phishing": "The email analysis found phishing indicators without a positive NLP classification.",
         "account_takeover": "The login analysis produced account takeover risk indicators.",
         "multimedia_manipulation": "The media assessment produced manipulation indicators; this does not alone establish a deepfake or identify who is depicted.",
+        "synthetic_voice": "Acoustic heuristics flagged this recording as likely AI-generated; this is not a validated model verdict.",
         "identity_impersonation": "Contextual security rules raised an identity impersonation concern; this does not establish that the media itself is manipulated.",
         "benign": "The phishing text model classified the message as benign, with no conflicting detector signal.",
         "no_threat_detected": "The login detectors reported no anomaly for the supplied event.",
@@ -20,6 +21,10 @@ def explain(fusion: dict, risk: dict, recommendations: list[dict]) -> dict:
             why.append(f"{detector['detector']} ({detector['detector_version']}) reported {detector['classification']}.")
         elif detector["normalized_signal"] == "conflict" and detector["detector"] in actual_conflicts:
             why.append(f"{detector['detector']} ({detector['detector_version']}) reported {detector['classification']}, which conflicts with other indicators.")
+        if detector.get("voice_origin_signal") == "support":
+            why.append(f"{detector['detector']} flagged the voice as likely AI-generated using acoustic heuristics.")
+        elif detector.get("voice_origin_signal") == "conflict" and detector["detector"] in actual_conflicts:
+            why.append(f"{detector['detector']} assessed the voice as likely human, conflicting with other voice-origin indicators.")
     if not why and threat in {"benign", "no_threat_detected"}:
         why.append("No detector reported a positive threat signal.")
     evidence = [{"detector": x["detector"], "indicator": x.get("indicator"), "type": x.get("type"),
@@ -58,6 +63,8 @@ def explain(fusion: dict, risk: dict, recommendations: list[dict]) -> dict:
         "noise_residual_inconsistency": "Inconsistent camera sensor noise (PRNU) variance observed across image spatial quadrants.",
         "blending_seam_detected": "Unnatural gradient sharpness and edge seams detected around localized foreground boundaries.",
         "synthetic_vocoder_cutoff": "Sharp brick-wall frequency cutoff detected in audio, characteristic of neural vocoder speech synthesis.",
+        "manipulation_model_indicator": "The evaluated local media model reported a synthetic-class score above its validation-selected threshold; the score is uncalibrated.",
+        "voice_origin_assessment": "Acoustic heuristic assessment of whether the voice is likely AI-generated, likely human, or inconclusive.",
         "low_vocal_microvariation": "Vocal track lacks natural biological micro-jitter and shimmer, displaying mechanical periodicity.",
         "robotic_pitch_stability": "Vocal pitch exhibits unnatural robotic flatness lacking human prosodic variation.",
         "unnatural_silence_dropout": "Audio contains artificial digital zero-energy dropouts rather than natural room acoustic ambiance.",

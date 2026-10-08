@@ -2,7 +2,7 @@
 from collections import defaultdict
 from datetime import datetime, timezone
 
-FUSION_VERSION = "threat-fusion-1.0.0"
+FUSION_VERSION = "threat-fusion-1.2.0"
 
 PHISHING_POSITIVE = {
     "phishing_nlp": {"phishing"},
@@ -65,6 +65,16 @@ def fuse(detector_results: list[dict]) -> dict:
         elif label in MEDIA_POSITIVE.get(name, set()):
             category = "multimedia_manipulation"
             signal = "support"
+        voice_origin = raw["features"].get("voice_origin")
+        voice_classification = voice_origin.get("classification") if isinstance(voice_origin, dict) else None
+        voice_signal = {
+            "likely_ai_generated": "support",
+            "likely_human": "conflict",
+        }.get(voice_classification, "neutral") if name == "multimedia_assessment" else "neutral"
+        if voice_signal == "support":
+            positives["synthetic_voice"].append(name)
+        elif voice_signal == "conflict":
+            negatives["synthetic_voice"].append(name)
         if category and signal == "support":
             positives[category].append(name)
         elif category and signal == "conflict":
@@ -75,10 +85,11 @@ def fuse(detector_results: list[dict]) -> dict:
             "normalized_signal": signal, "confidence": raw["confidence"],
             "confidence_status": raw.get("confidence_status", "unavailable"),
             "evidence": raw["evidence"], "features": raw["features"], "limitations": raw["limitations"],
+            "voice_origin_signal": voice_signal,
         })
 
     categories = {}
-    for category in {"phishing", "account_takeover", "multimedia_manipulation"}:
+    for category in {"phishing", "account_takeover", "multimedia_manipulation", "synthetic_voice"}:
         support = list(dict.fromkeys(positives[category]))
         # A benign/no-anomaly result is a disagreement only when another detector
         # in that threat family has raised a positive signal.
@@ -104,6 +115,8 @@ def fuse(detector_results: list[dict]) -> dict:
         threat = "benign"
     elif negatives["account_takeover"]:
         threat = "no_threat_detected"
+    elif categories.get("synthetic_voice", {}).get("support_count", 0):
+        threat = "synthetic_voice"
     elif categories.get("multimedia_manipulation", {}).get("support_count", 0):
         threat = "multimedia_manipulation"
     else:
@@ -121,13 +134,20 @@ def fuse(detector_results: list[dict]) -> dict:
                 independent.add((result["detector"], indicator))
     relevant = categories.get({"phishing": "phishing", "suspicious_phishing": "phishing",
                                "account_takeover": "account_takeover",
-                               "multimedia_manipulation": "multimedia_manipulation"}.get(threat, "phishing"), {})
+                               "multimedia_manipulation": "multimedia_manipulation",
+                               "synthetic_voice": "synthetic_voice"}.get(threat, "phishing"), {})
+    voice_origin = next(
+        (result["features"]["voice_origin"] for result in normalized
+         if isinstance(result["features"].get("voice_origin"), dict)),
+        None,
+    )
     return {
         "fusion_version": FUSION_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "threat": threat,
         "detector_results": normalized,
         "categories": categories,
+        "voice_origin": voice_origin,
         "supporting_detectors": relevant.get("supporting_detectors", []),
         "conflicting_detectors": relevant.get("conflicting_detectors", []),
         "agreement": relevant.get("agreement", "no_signal"),

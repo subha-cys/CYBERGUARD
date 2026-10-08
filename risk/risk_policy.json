@@ -1,5 +1,5 @@
 {
-  "version": "risk-policy-1.0.0",
+  "version": "risk-policy-1.1.0",
   "levels": [
     {"name": "low", "min": 0, "max": 24},
     {"name": "medium", "min": 25, "max": 49},
@@ -7,7 +7,7 @@
     {"name": "critical", "min": 75, "max": 100}
   ],
   "incident_min_score": 50,
-  "threat_base_points": {"phishing": 0, "suspicious_phishing": 0, "account_takeover": 10, "multimedia_manipulation": 15, "benign": 0, "no_threat_detected": 0, "undetermined": 0},
+  "threat_base_points": {"phishing": 0, "suspicious_phishing": 0, "account_takeover": 10, "multimedia_manipulation": 15, "synthetic_voice": 15, "benign": 0, "no_threat_detected": 0, "undetermined": 0},
   "evidence_points": {
     "credential_request": 20,
     "suspicious_url": 25,

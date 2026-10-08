@@ -1,6 +1,8 @@
 """Comprehensive unit and integration tests for Deepfake & Multimedia Authenticity Detection."""
+import io
 import pytest
 from pathlib import Path
+import wave
 
 from config.multimedia_config import check_system_capabilities, get_multimedia_config, update_multimedia_config
 from datasets.media_fixtures import (
@@ -12,11 +14,12 @@ from datasets.media_fixtures import (
     create_manipulated_video_fixture,
     ensure_all_fixtures,
 )
-from detectors.multimedia import analyze_image, analyze_audio, analyze_video
+from detectors.multimedia import _assess_voice_origin, analyze_image, analyze_audio, analyze_video
 from features.multimedia_image import extract_image_features
-from features.multimedia_audio import extract_audio_features
+from features.multimedia_audio import _decode_pcm, extract_audio_features
 from features.multimedia_video import extract_video_features
 from backend.service import run_demo, analyze_request
+from fusion.engine import fuse
 
 
 def test_system_capabilities_inspection():
@@ -61,17 +64,38 @@ def test_image_feature_extraction_and_detection():
     # Test detector outputs
     norm_res = analyze_image(norm_path).to_dict()
     assert norm_res["features"]["concern_level"] == "LOW CONCERN"
-    assert norm_res["features"]["authenticity_score"] > 0.85
-    assert norm_res["features"]["manipulation_probability"] < 0.15
+    assert norm_res["features"]["authenticity_score"] is None
+    assert norm_res["features"]["manipulation_probability"] is None
+    assert 0 <= norm_res["features"]["manipulation_indicator_score"] <= 1
+    assert norm_res["confidence"] is None
 
     manip_res = analyze_image(manip_path).to_dict()
     assert manip_res["features"]["concern_level"] == "HIGH CONCERN"
-    assert manip_res["features"]["authenticity_score"] < 0.20
-    assert manip_res["features"]["manipulation_probability"] > 0.80
+    assert manip_res["features"]["authenticity_score"] is None
+    assert manip_res["features"]["manipulation_probability"] is None
+    assert manip_res["features"]["manipulation_indicator_score"] >= 0.70
     assert len(manip_res["features"]["detected_indicators"]) >= 2
 
 
+def test_boundary_seam_contributes_to_uncalibrated_indicator_score(monkeypatch):
+    path = create_normal_image_fixture()
+    monkeypatch.setattr(
+        "detectors.multimedia.extract_image_features",
+        lambda _: {
+            "ela_patch_discrepancy_ratio": 3.0,
+            "fft_peak_prominence": 1.0,
+            "fft_high_freq_spike": 0.0,
+            "noise_variance_quadrant_ratio": 1.0,
+            "edge_contrast_ratio": 20.0,
+        },
+    )
+    result = analyze_image(path).to_dict()
+    assert result["features"]["manipulation_indicator_score"] == 0.44
+
+
 def test_audio_feature_extraction_and_detection():
+    assert _assess_voice_origin({}, [])["classification"] == "inconclusive"
+
     norm_path = create_normal_audio_fixture()
     synth_path = create_synthetic_audio_fixture()
 
@@ -90,13 +114,68 @@ def test_audio_feature_extraction_and_detection():
     # Test detector outputs
     norm_res = analyze_audio(norm_path).to_dict()
     assert norm_res["features"]["concern_level"] == "LOW CONCERN"
-    assert norm_res["features"]["authenticity_score"] > 0.85
+    assert norm_res["features"]["authenticity_score"] is None
+    assert norm_res["features"]["manipulation_probability"] is None
+    assert norm_res["confidence"] is None
+    assert norm_res["features"]["voice_origin"]["classification"] == "likely_human"
+    assert norm_res["features"]["voice_origin"]["confidence"] is None
+    human_fusion = fuse([norm_res])
+    assert human_fusion["threat"] == "undetermined"
+    assert human_fusion["detector_results"][0]["voice_origin_signal"] == "conflict"
 
     synth_res = analyze_audio(synth_path).to_dict()
     assert synth_res["features"]["concern_level"] == "HIGH CONCERN"
-    assert synth_res["features"]["authenticity_score"] < 0.20
-    assert synth_res["features"]["manipulation_probability"] > 0.80
+    assert synth_res["features"]["authenticity_score"] is None
+    assert synth_res["features"]["manipulation_probability"] is None
+    assert synth_res["features"]["manipulation_indicator_score"] >= 0.70
     assert len(synth_res["features"]["detected_indicators"]) >= 2
+    assert synth_res["features"]["voice_origin"]["classification"] == "likely_ai_generated"
+    assert synth_res["features"]["voice_origin"]["confidence"] is None
+
+    fused = fuse([synth_res])
+    assert fused["threat"] == "synthetic_voice"
+    assert fused["voice_origin"]["classification"] == "likely_ai_generated"
+
+
+def test_long_audio_analysis_is_bounded_to_ten_seconds():
+    sample_rate = 16_000
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as stream:
+        stream.setnchannels(1)
+        stream.setsampwidth(2)
+        stream.setframerate(sample_rate)
+        stream.writeframes(b"\x00\x00" * (sample_rate * 11))
+
+    features = extract_audio_features(buffer.getvalue())
+    assert features["duration_seconds"] == 11.0
+    assert features["analyzed_duration_seconds"] == 10.0
+    assert features["analysis_truncated"] is True
+    assert features["sample_count"] == sample_rate * 10
+
+
+def test_24_bit_pcm_is_sign_extended_and_scaled():
+    pcm = bytes((0x00, 0x00, 0x80, 0xFF, 0xFF, 0x7F))
+    decoded = _decode_pcm(pcm, 3)
+    assert decoded.tolist() == [-(1 << 31), (1 << 31) - 256]
+
+
+def test_media_feature_extraction_failures_are_inconclusive(tmp_path):
+    bad_audio = tmp_path / "broken.wav"
+    bad_audio.write_bytes(b"not an audio file")
+    audio_result = analyze_audio(bad_audio).to_dict()
+    assert audio_result["classification"] == "inconclusive"
+    assert audio_result["confidence"] is None
+    assert audio_result["features"]["analysis_status"] == "inconclusive"
+    assert audio_result["evidence"][0]["indicator"] == "feature_extraction_failed"
+    request_result = analyze_request({"type": "audio", "path": str(bad_audio)}, persist_incident=False)
+    assert request_result["concern_level"] is None
+    assert request_result["fusion"]["detector_results"][0]["classification"] == "inconclusive"
+
+    bad_video = tmp_path / "broken.avi"
+    bad_video.write_bytes(b"not a video file")
+    video_result = analyze_video(bad_video).to_dict()
+    assert video_result["classification"] == "inconclusive"
+    assert video_result["confidence"] is None
 
 
 def test_video_feature_extraction_and_detection():
@@ -117,19 +196,22 @@ def test_video_feature_extraction_and_detection():
     # Test detector outputs
     norm_res = analyze_video(norm_path).to_dict()
     assert norm_res["features"]["concern_level"] == "LOW CONCERN"
-    assert norm_res["features"]["authenticity_score"] > 0.85
+    assert norm_res["features"]["authenticity_score"] is None
+    assert norm_res["features"]["manipulation_probability"] is None
+    assert norm_res["confidence"] is None
 
     manip_res = analyze_video(manip_path).to_dict()
     assert manip_res["features"]["concern_level"] == "HIGH CONCERN"
-    assert manip_res["features"]["authenticity_score"] < 0.25
-    assert manip_res["features"]["manipulation_probability"] > 0.70
+    assert manip_res["features"]["authenticity_score"] is None
+    assert manip_res["features"]["manipulation_probability"] is None
+    assert manip_res["features"]["manipulation_indicator_score"] >= 0.70
 
 
 @pytest.mark.parametrize("demo_id,expected_concern,expected_threat,min_risk,max_risk", [
     ("normal_image", "LOW CONCERN", "undetermined", 0, 24),
     ("synthetic_manipulated_image", "HIGH CONCERN", "multimedia_manipulation", 75, 100),
     ("normal_audio", "LOW CONCERN", "undetermined", 0, 24),
-    ("synthetic_audio", "HIGH CONCERN", "multimedia_manipulation", 75, 100),
+    ("synthetic_audio", "HIGH CONCERN", "synthetic_voice", 75, 100),
     ("normal_video", "LOW CONCERN", "undetermined", 0, 24),
     ("manipulated_video", "HIGH CONCERN", "multimedia_manipulation", 75, 100),
 ])
@@ -137,8 +219,15 @@ def test_all_six_synthetic_demonstration_cases(demo_id, expected_concern, expect
     result = run_demo(demo_id)
     assert result["concern_level"] == expected_concern
     assert result["threat_category"] == expected_threat
+    if demo_id == "normal_audio":
+        assert result["voice_origin"]["classification"] == "likely_human"
+    elif demo_id == "synthetic_audio":
+        assert result["voice_origin"]["classification"] == "likely_ai_generated"
     assert min_risk <= result["risk_score"] <= max_risk
-    assert isinstance(result["authenticity_score"], float)
-    assert isinstance(result["manipulation_probability"], float)
+    if demo_id in {"normal_image", "synthetic_manipulated_image", "normal_audio",
+                   "synthetic_audio", "normal_video", "manipulated_video"}:
+        assert result["authenticity_score"] is None
+        assert result["manipulation_probability"] is None
+        assert isinstance(result["manipulation_indicator_score"], float)
     assert isinstance(result["recommended_action"], list)
     assert len(result["recommended_action"]) > 0

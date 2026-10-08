@@ -23,6 +23,8 @@ datasets/phishing_email.manifest.json
 datasets/media_fixtures/
 models/*/model.joblib
 models/*/registry.json
+models/media/*.joblib
+models/media/*.registry.json
 database/incidents.sqlite3
 database/dashboard.sqlite3
 database/*.sqlite3-shm

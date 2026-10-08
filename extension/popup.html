@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CYBERGUARD</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header><span class="mark">C</span><div><strong>CYBERGUARD</strong><small>LOCAL BROWSER PROTECTION</small></div></header>
+    <div id="serviceState" class="service-state"><i></i><span>Checking local analysis service...</span></div>
+    <section class="monitor-row">
+      <div><strong>Website monitoring</strong><small id="monitorDescription">Off until you enable it</small></div>
+      <button id="monitorToggle" class="toggle" type="button" role="switch" aria-checked="false" aria-label="Enable website monitoring"><span></span></button>
+    </section>
+    <section id="lastScan" class="last-scan" hidden></section>
+    <button id="openDashboard" class="dashboard-button" type="button">Open analyst dashboard <span>-&gt;</span></button>
+    <p class="privacy">Page URLs, titles and login-form structure are sent to your local CYBERGUARD service. Form values and page body text are not collected.</p>
+    <p id="error" class="error" role="alert" hidden></p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

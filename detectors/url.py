@@ -7,11 +7,11 @@ from detectors.contract import DetectorResult
 from features.url import URL_FEATURE_VERSION, extract_url_features, detect_url_mismatch
 from features.webpage import extract_webpage_features, WEBPAGE_FEATURE_VERSION
 
-DETECTOR_VERSION = "url-unified-2.0.0"
+DETECTOR_VERSION = "url-unified-2.1.0"
 
 
-def calculate_malicious_probability(evidence: list[dict[str, Any]]) -> float:
-    """Compute calibrated malicious URL probability from observed indicators."""
+def calculate_indicator_score(evidence: list[dict[str, Any]]) -> float:
+    """Compute an uncalibrated indicator score; this is not a probability."""
     if not evidence:
         return 0.02
     weights = {
@@ -33,9 +33,8 @@ def calculate_malicious_probability(evidence: list[dict[str, Any]]) -> float:
         "brand_impersonation": 0.35,
     }
     raw_score = sum(weights.get(e.get("indicator", ""), 0.08) for e in evidence)
-    # Bounded probabilistic saturation curve
-    prob = round(1.0 - (1.0 / (1.0 + raw_score * 1.6)), 3)
-    return min(0.99, max(0.01, prob))
+    score = round(1.0 - (1.0 / (1.0 + raw_score * 1.6)), 3)
+    return min(0.99, max(0.01, score))
 
 
 def analyze_url(
@@ -99,7 +98,7 @@ def analyze_url(
         if web_features["brand_impersonation"]:
             evidence.append({"type": "webpage_indicator", "indicator": "brand_impersonation", "value": web_features["claimed_brand"]})
 
-    malicious_prob = calculate_malicious_probability(evidence)
+    indicator_score = calculate_indicator_score(evidence)
     classification = "suspicious_indicators" if evidence else "no_lexical_indicators"
 
     limitations = [
@@ -114,7 +113,8 @@ def analyze_url(
     combined_features = {
         **f,
         "feature_version": URL_FEATURE_VERSION,
-        "malicious_url_probability": malicious_prob,
+        "malicious_url_probability": None,
+        "malicious_url_indicator_score": indicator_score,
         **({f"webpage_{k}": v for k, v in web_features.items()} if web_features else {}),
     }
 
@@ -123,11 +123,10 @@ def analyze_url(
         detector_version=DETECTOR_VERSION,
         method="hybrid",
         classification=classification,
-        confidence=malicious_prob,
-        confidence_status="calibrated_heuristic",
+        confidence=None,
+        confidence_status="unavailable",
         evidence=evidence,
         features=combined_features,
         limitations=limitations,
         processing_time_ms=elapsed,
     )
-

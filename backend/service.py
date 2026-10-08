@@ -13,10 +13,12 @@ from pathlib import Path
 
 from backend.pipeline import analyze
 from database.incidents import DEFAULT_DB, IncidentStore
+from risk.sensitivity import infer_asset_sensitivity
 
 ROOT = Path(__file__).resolve().parents[1]
 PHISHING_MODEL = ROOT / "models/phishing/model.joblib"
 LOGIN_MODEL = ROOT / "models/login/model.joblib"
+MEDIA_MODEL_DIR = ROOT / "models/media"
 DASHBOARD_DB = ROOT / "database/dashboard.sqlite3"
 
 
@@ -30,6 +32,14 @@ def _phishing_detector():
 def _login_ml_detector():
     from detectors.login_ml import LoginIsolationForestDetector
     return LoginIsolationForestDetector(LOGIN_MODEL)
+
+
+@lru_cache(maxsize=3)
+def _media_model(modality: str):
+    from detectors.media_model import load_media_model
+
+    artifact = MEDIA_MODEL_DIR / f"{modality}.joblib"
+    return load_media_model(modality, artifact) if artifact.is_file() else None
 
 
 def _init_metrics():
@@ -175,7 +185,7 @@ def _detectors_for(payload: dict) -> tuple[list[dict], dict]:
                 raise ValueError(f"media path does not identify an existing file: {media_path}")
             raw_len = media_path.stat().st_size
             filename = payload.get("filename") or media_path.name
-            result = analyzer(media_path)
+            result = analyzer(media_path, model=_media_model(normalized_kind))
             results = [_add_evidence_result(result)]
             details = {"media_type": kind, "filename": filename, "byte_length": raw_len}
         else:
@@ -194,7 +204,7 @@ def _detectors_for(payload: dict) -> tuple[list[dict], dict]:
                 temp_path = Path(stream.name)
                 stream.write(raw)
             try:
-                result = analyzer(temp_path)
+                result = analyzer(temp_path, model=_media_model(normalized_kind))
             finally:
                 temp_path.unlink(missing_ok=True)
             results = [_add_evidence_result(result)]
@@ -207,44 +217,51 @@ def _detectors_for(payload: dict) -> tuple[list[dict], dict]:
 def analyze_request(
     payload: dict,
     *,
-    asset_sensitivity: str = "medium",
     persist_incident: bool = True,
 ) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("request must be a JSON object")
     started = time.perf_counter()
     detector_results, input_details = _detectors_for(payload)
-    result = analyze(detector_results, asset_sensitivity=asset_sensitivity)
+    sensitivity = infer_asset_sensitivity(payload)
+    result = analyze(detector_results, asset_sensitivity=sensitivity["level"])
+    result["risk"]["asset_sensitivity_assessment"] = sensitivity
+    result["asset_sensitivity"] = sensitivity
     processing_ms = round((time.perf_counter() - started) * 1000, 3)
 
     # Compute top-level standard contract fields
-    phishing_probs = [
-        d["features"].get("phishing_probability", 0.90 if d["classification"] == "phishing" else 0.05)
+    phishing_scores = [
+        d["features"].get("phishing_model_score_uncalibrated")
         for d in detector_results if d["detector"] == "phishing_nlp"
     ]
-    phishing_prob = phishing_probs[0] if phishing_probs else 0.0
+    phishing_score = next((score for score in phishing_scores if score is not None), None)
 
-    url_probs = [
-        d["features"].get("malicious_url_probability", d.get("confidence", 0.02))
+    url_scores = [
+        d["features"].get("malicious_url_indicator_score")
         for d in detector_results if d["detector"] == "url_lexical"
     ]
-    malicious_url_prob = max(url_probs) if url_probs else 0.0
+    url_scores = [score for score in url_scores if score is not None]
+    url_score = max(url_scores) if url_scores else None
 
     # Multimedia authenticity contract fields
     media_results = [d for d in detector_results if d["detector"] == "multimedia_assessment"]
     if media_results:
         m_feat = media_results[0].get("features", {})
-        result["authenticity_score"] = m_feat.get("authenticity_score", 1.0)
-        result["manipulation_probability"] = m_feat.get("manipulation_probability", 0.0)
-        result["confidence"] = m_feat.get("confidence", 0.80)
+        result["authenticity_score"] = None
+        result["manipulation_probability"] = None
+        result["manipulation_indicator_score"] = m_feat.get("manipulation_indicator_score")
+        result["confidence"] = media_results[0].get("confidence")
         result["detected_indicators"] = m_feat.get("detected_indicators", [])
-        result["concern_level"] = m_feat.get("concern_level", "LOW CONCERN")
+        result["concern_level"] = m_feat.get("concern_level")
+        result["voice_origin"] = m_feat.get("voice_origin")
     else:
         result["authenticity_score"] = None
         result["manipulation_probability"] = None
+        result["manipulation_indicator_score"] = None
         result["confidence"] = None
         result["detected_indicators"] = []
         result["concern_level"] = None
+        result["voice_origin"] = None
 
     result["processing_time_ms"] = processing_ms
     result["input"] = {"type": payload.get("type"), **input_details}
@@ -252,8 +269,10 @@ def analyze_request(
     if synthetic_demo:
         result["input"]["synthetic_demo"] = True
         result["input"]["scenario"] = str(payload.get("demo_id") or "prefilled synthetic scenario")
-    result["phishing_probability"] = round(phishing_prob, 4)
-    result["malicious_url_probability"] = round(malicious_url_prob, 4)
+    result["phishing_probability"] = None
+    result["phishing_model_score_uncalibrated"] = phishing_score
+    result["malicious_url_probability"] = None
+    result["malicious_url_indicator_score"] = url_score
     result["risk_score"] = result["risk"]["risk_score"]
     result["risk_level"] = result["concern_level"] or result["risk"]["severity"].upper()
     result["threat_category"] = result["fusion"]["threat"]
@@ -343,29 +362,50 @@ def dashboard_data() -> dict:
     active_incidents = [x for x in incidents if x["status"] not in {"resolved"}]
     detector_status = []
     for name, version, path in [
-        ("Phishing NLP", "phishing-nlp-1.0.0", PHISHING_MODEL),
-        ("Unified URL & Domain Analysis", "url-unified-2.0.0", None),
+        ("Phishing NLP", "phishing-nlp-1.1.0", PHISHING_MODEL),
+        ("Unified URL & Domain Analysis", "url-unified-2.1.0", None),
         ("Webpage DOM Security Analyzer", "webpage-dom-1.0.0", None),
         ("Phishing security rules", "security-text-2.0.0", None),
         ("Login anomaly rules", "login-rules-1.0.0", None),
         ("Login Isolation Forest", "login-iforest-1.0.0", LOGIN_MODEL),
-        ("Multimedia metadata assessment", "multimedia-assessment-1.0.0", None),
+        ("Multimedia metadata assessment", "multimedia-authenticity-2.2.0", None),
+        ("Trained image authenticity model", "image-logistic-features-1.0.0",
+         MEDIA_MODEL_DIR / "image.joblib"),
+        ("Trained audio authenticity model", "audio-logistic-features-1.0.0",
+         MEDIA_MODEL_DIR / "audio.joblib"),
+        ("Trained video authenticity model", "video-logistic-features-1.0.0",
+         MEDIA_MODEL_DIR / "video.joblib"),
     ]:
         detector_status.append({"name": name, "version": version,
                                 "status": "ready" if path is None or path.is_file() else "model unavailable"})
     avg = sum(row[2] for row in rows) / len(rows) if rows else 0
     def registry_version(model_path: Path, default: str) -> str:
-        registry = model_path.with_name("registry.json")
-        try:
-            return json.loads(registry.read_text(encoding="utf-8")).get("model_version", default)
-        except (OSError, json.JSONDecodeError):
-            return default
+        candidates = (
+            model_path.with_name(f"{model_path.stem}.registry.json"),
+            model_path.with_name("registry.json"),
+        )
+        for registry in candidates:
+            try:
+                return json.loads(registry.read_text(encoding="utf-8")).get("model_version", default)
+            except FileNotFoundError:
+                continue
+            except (OSError, json.JSONDecodeError):
+                return default
+        return default
     return {"total_analyses": len(rows), "active_incidents": len(active_incidents),
             "severity_distribution": severity, "threat_categories": threats,
             "recent_incidents": incidents[:8], "average_processing_ms": round(avg, 2),
             "detector_status": detector_status,
-            "model_versions": {"phishing": registry_version(PHISHING_MODEL, "unavailable") if PHISHING_MODEL.is_file() else "unavailable",
-                               "login": registry_version(LOGIN_MODEL, "unavailable") if LOGIN_MODEL.is_file() else "unavailable"},
+            "model_versions": {
+                "phishing": registry_version(PHISHING_MODEL, "unavailable") if PHISHING_MODEL.is_file() else "unavailable",
+                "login": registry_version(LOGIN_MODEL, "unavailable") if LOGIN_MODEL.is_file() else "unavailable",
+                **{
+                    f"media_{modality}": registry_version(MEDIA_MODEL_DIR / f"{modality}.joblib",
+                                                         f"{modality}-logistic-features-1.0.0")
+                    if (MEDIA_MODEL_DIR / f"{modality}.joblib").is_file() else "not trained"
+                    for modality in ("image", "audio", "video")
+                },
+            },
             "updated_at": datetime.now(timezone.utc).isoformat()}
 
 

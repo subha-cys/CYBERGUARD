@@ -20,7 +20,9 @@ def test_phishing_model_roundtrip_in_tmp_path(tmp_path):
             "features", "limitations", "processing_time_ms", "timestamp", "model_version",
             "confidence_status"} <= result.to_dict().keys()
     assert result.detector == "phishing_nlp" and result.model_version == "test-only"
-    assert result.confidence is None or 0 <= result.confidence <= 1
+    assert result.confidence is None
+    assert result.features["phishing_probability"] is None
+    assert result.features["phishing_model_score_uncalibrated"] is not None
     assert result.features["feature_version"]
     with pytest.raises(ValueError): PhishingNLPDetector(artifact).analyze("  ")
 
@@ -52,3 +54,45 @@ def test_prepare_dataset_schema_and_label_mapping(tmp_path):
             writer.writerow({"body": f"ordinary note {i}", "category": "unknown"})
     with pytest.raises(ValueError, match="unmapped label"):
         prepare_csv(bad, tmp_path / "invalid.csv", "body", "category", "bad", "good")
+
+
+def test_media_training_keeps_source_groups_disjoint_and_loads_audio_adapter(tmp_path, monkeypatch):
+    import csv
+    from detectors.media_model import load_media_model
+    from training import media
+
+    manifest = tmp_path / "audio_manifest.csv"
+    rows = []
+    for group_index in range(12):
+        for label in ("authentic", "synthetic"):
+            for sample_index in range(4):
+                name = f"group{group_index:02d}_{label}_{sample_index}.wav"
+                (tmp_path / name).write_bytes(f"{group_index}:{label}:{sample_index}".encode())
+                rows.append({"file": name, "label": label, "group_id": f"group{group_index:02d}"})
+
+    with manifest.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=["file", "label", "group_id"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    def fake_features(modality, path):
+        assert modality == "audio"
+        return {
+            "class_cue": float("_synthetic_" in path.name),
+            "source_variation": float(path.name[5:7]),
+        }
+
+    monkeypatch.setattr(media, "_features_for", fake_features)
+    registry = media.train_and_evaluate("audio", manifest, tmp_path / "models", seed=13)
+
+    assert registry["group_leakage_check_passed"] is True
+    assert set(registry["held_out_test_metrics"]["confusion_matrix_labels"]) == {"authentic", "synthetic"}
+    assert "false_positive_rate" in registry["held_out_test_metrics"]
+    adapter = load_media_model("audio", tmp_path / "models" / "audio.joblib")
+    output = adapter.analyze(
+        tmp_path / "group00_synthetic_00.wav",
+        {"class_cue": 1.0, "source_variation": 0.0},
+    )
+    assert output["classification"] == "manipulation_indicators_detected"
+    assert output["confidence"] is None
+    assert output["voice_origin"]["classification"] == "likely_ai_generated"

@@ -20,7 +20,7 @@ from features.multimedia_audio import extract_audio_features
 from features.multimedia_image import extract_image_features
 from features.multimedia_video import extract_video_features
 
-DETECTOR_VERSION = "multimedia-authenticity-2.0.0"
+DETECTOR_VERSION = "multimedia-authenticity-2.2.0"
 MAX_FILE_BYTES = 100 * 1024 * 1024
 EPISTEMIC_LIMITATION = (
     "Classification is a statistical model prediction and does not represent definitive proof of manipulation. "
@@ -163,13 +163,63 @@ def _optional_model(model, path: Path, features: dict, modality: str):
     return result, evidence
 
 
-def _determine_concern(probability: float) -> tuple[str, str]:
-    """Map calibrated probability to concern level and classifier label."""
-    if probability >= 0.70:
+def _determine_concern(indicator_score: float) -> tuple[str, str]:
+    """Map the uncalibrated heuristic indicator score to an advisory label."""
+    if indicator_score >= 0.70:
         return "HIGH CONCERN", "manipulation_indicators_detected"
-    if probability >= 0.35:
+    if indicator_score >= 0.35:
         return "MODERATE CONCERN", "suspicious"
     return "LOW CONCERN", "no_significant_indicators"
+
+
+def _extraction_failure(modality: str, path: Path, error: Exception, start: float) -> DetectorResult:
+    return _result(
+        "inconclusive",
+        method="feature_extraction_unavailable",
+        evidence=[{"indicator": "feature_extraction_failed", "type": "analysis_error", "value": str(error)}],
+        features={"media_type": modality, "filename": path.name, "analysis_status": "inconclusive"},
+        limitations=[
+            f"{modality.capitalize()} features could not be extracted; no authenticity or manipulation conclusion was made.",
+            EPISTEMIC_LIMITATION,
+        ],
+        elapsed=(time.perf_counter() - start) * 1000,
+    )
+
+
+def _assess_voice_origin(features: dict[str, Any], detected_indicators: list[dict[str, str]]) -> dict[str, Any]:
+    """Return a cautious voice-origin heuristic, not a validated deepfake verdict."""
+    indicators = [item["indicator"] for item in detected_indicators]
+    has_voice = features.get("mean_f0_hz", 0) > 60 and features.get("duration_seconds", 0) >= 0.5
+    jitter = features.get("vocal_jitter", 0)
+    pitch_variation = features.get("f0_std_hz", 0)
+    high_frequency_energy = features.get("high_frequency_energy_ratio", 0)
+
+    if has_voice and len(indicators) >= 2:
+        classification = "likely_ai_generated"
+        evidence = indicators
+    elif (
+        has_voice
+        and not indicators
+        and jitter >= 0.002
+        and pitch_variation >= 5
+        and high_frequency_energy >= 0.0001
+    ):
+        classification = "likely_human"
+        evidence = ["organic_voice_microvariation", "variable_pitch_contour", "broadband_voice_energy"]
+    else:
+        classification = "inconclusive"
+        evidence = indicators
+
+    return {
+        "classification": classification,
+        "method": "unvalidated_acoustic_heuristic",
+        "confidence": None,
+        "evidence": evidence,
+        "limitations": [
+            "This heuristic is not validated on a representative voice dataset and cannot establish whether a speaker is human or AI-generated.",
+            "Codec, bandwidth, noise reduction, speaking style, and health can change these acoustic features.",
+        ],
+    }
 
 
 def analyze_image(path: str | Path, model: ImageManipulationModel | None = None) -> DetectorResult:
@@ -189,11 +239,11 @@ def analyze_image(path: str | Path, model: ImageManipulationModel | None = None)
     try:
         features = extract_image_features(p)
     except Exception as exc:
-        features = {"extraction_error": str(exc)}
+        return _extraction_failure("image", p, exc, start)
 
     evidence = [{"indicator": "image_format_metadata", "type": "observed_file_property", "value": header}]
     detected_indicators = []
-    prob_score = 0.04  # baseline benign
+    indicator_score_raw = 0.04
 
     ela_ratio = features.get("ela_patch_discrepancy_ratio", 1.0)
     fft_prominence = features.get("fft_peak_prominence", 1.0)
@@ -203,51 +253,50 @@ def analyze_image(path: str | Path, model: ImageManipulationModel | None = None)
 
     # 1. Error Level Analysis (Compression Inconsistency)
     if ela_ratio >= 15.0:
-        prob_score += 0.45
+        indicator_score_raw += 0.45
         ind = "compression_inconsistency_ela"
         evidence.append({"indicator": ind, "type": "compression_analysis", "value": f"discrepancy ratio {ela_ratio:.1f}"})
         detected_indicators.append("Significant local recompression error variance (ELA) indicating splicing or composite layers.")
     elif ela_ratio >= 3.0:
-        prob_score += 0.25
+        indicator_score_raw += 0.25
         ind = "compression_inconsistency_ela"
         evidence.append({"indicator": ind, "type": "compression_analysis", "value": f"discrepancy ratio {ela_ratio:.1f}"})
         detected_indicators.append("Moderate compression inconsistency across image segments.")
 
     # 2. 2D FFT Spectral Generative Grid Spikes
     if fft_prominence >= 120.0 or fft_spike >= 2.0:
-        prob_score += 0.45
+        indicator_score_raw += 0.45
         ind = "spectral_grid_artifacts"
         evidence.append({"indicator": ind, "type": "frequency_analysis", "value": f"peak prominence {fft_prominence:.1f}"})
         detected_indicators.append("Periodic high-frequency spectral peaks characteristic of generative model deconvolution kernels.")
     elif fft_prominence >= 50.0 or fft_spike >= 1.2:
-        prob_score += 0.20
+        indicator_score_raw += 0.20
         ind = "spectral_grid_artifacts"
         evidence.append({"indicator": ind, "type": "frequency_analysis", "value": f"peak prominence {fft_prominence:.1f}"})
         detected_indicators.append("Subtle high-frequency spectral grid irregularities.")
 
     # 3. Noise Residual Inconsistency
     if noise_ratio >= 2.8:
-        prob_score += 0.25
+        indicator_score_raw += 0.25
         ind = "noise_residual_inconsistency"
         evidence.append({"indicator": ind, "type": "sensor_noise", "value": f"variance ratio {noise_ratio:.2f}"})
         detected_indicators.append("Discontinuous PRNU sensor noise floor across spatial quadrants.")
 
     # 4. Sharp Boundary Seams
     if edge_contrast >= 18.0 and ela_ratio >= 2.5:
-        prob_score += 0.15
+        indicator_score_raw += 0.15
         ind = "blending_seam_detected"
         evidence.append({"indicator": ind, "type": "edge_analysis", "value": f"edge contrast {edge_contrast:.1f}"})
         detected_indicators.append("Sharp transition boundaries around foreground regions.")
 
-    manip_prob = round(min(0.96, max(0.03, prob_score)), 4)
-    auth_score = round(1.0 - manip_prob, 4)
-    concern_level, classification = _determine_concern(manip_prob)
-    confidence = round(min(0.95, 0.70 + 0.05 * len(detected_indicators)), 2)
+    indicator_score = round(min(0.96, max(0.03, indicator_score_raw)), 4)
+    concern_level, classification = _determine_concern(indicator_score)
 
     features.update({
-        "authenticity_score": auth_score,
-        "manipulation_probability": manip_prob,
-        "confidence": confidence,
+        "authenticity_score": None,
+        "manipulation_probability": None,
+        "manipulation_indicator_score": indicator_score,
+        "confidence": None,
         "concern_level": concern_level,
         "detected_indicators": detected_indicators,
     })
@@ -258,7 +307,7 @@ def analyze_image(path: str | Path, model: ImageManipulationModel | None = None)
     ]
 
     model_output = _optional_model(model, p, features, "image")
-    method, model_version = "signal_and_compression_heuristics", None
+    method, model_version, confidence = "signal_and_compression_heuristics", None, None
     if model_output:
         output, model_evidence = model_output
         classification = output["classification"]
@@ -289,7 +338,7 @@ def analyze_audio(path: str | Path, model: AudioDeepfakeModel | None = None) -> 
     try:
         features = extract_audio_features(p)
     except Exception as exc:
-        features = {"byte_length": len(data), "sha256": hashlib.sha256(data).hexdigest(), "extraction_error": str(exc)}
+        return _extraction_failure("audio", p, exc, start)
 
     evidence.append({
         "indicator": "audio_stream_properties",
@@ -297,10 +346,12 @@ def analyze_audio(path: str | Path, model: AudioDeepfakeModel | None = None) -> 
         "value": {
             "sample_rate_hz": features.get("sample_rate_hz"),
             "duration_seconds": features.get("duration_seconds"),
+            "analyzed_duration_seconds": features.get("analyzed_duration_seconds"),
+            "analysis_truncated": features.get("analysis_truncated", False),
         },
     })
 
-    prob_score = 0.04  # baseline benign
+    indicator_score_raw = 0.04
 
     hf_ratio = features.get("high_frequency_energy_ratio", 0.01)
     rolloff = features.get("spectral_rolloff_hz", 7000.0)
@@ -310,63 +361,77 @@ def analyze_audio(path: str | Path, model: AudioDeepfakeModel | None = None) -> 
 
     # 1. Neural Vocoder Brick-Wall Cutoff
     if hf_ratio < 0.00005 and rolloff <= 5500:
-        prob_score += 0.45
+        indicator_score_raw += 0.45
         ind = "synthetic_vocoder_cutoff"
         evidence.append({"indicator": ind, "type": "spectral_analysis", "value": f"cutoff rolloff {rolloff}Hz, HF ratio {hf_ratio}"})
-        detected_indicators.append("Sharp brick-wall frequency cutoff characteristic of neural vocoder synthesis (e.g. HiFi-GAN/MelGAN).")
+        detected_indicators.append({"indicator": ind, "description": "Sharp brick-wall frequency cutoff characteristic of neural vocoder synthesis."})
     elif hf_ratio < 0.0005:
-        prob_score += 0.20
+        indicator_score_raw += 0.20
         ind = "synthetic_vocoder_cutoff"
         evidence.append({"indicator": ind, "type": "spectral_analysis", "value": f"HF ratio {hf_ratio}"})
-        detected_indicators.append("Unusually low high-frequency acoustic presence.")
+        detected_indicators.append({"indicator": ind, "description": "Unusually low high-frequency acoustic presence."})
 
     # 2. Vocal Micro-Variation (Jitter Perturbation)
     if jitter < 0.001 and features.get("mean_f0_hz", 0) > 60:
-        prob_score += 0.40
+        indicator_score_raw += 0.40
         ind = "low_vocal_microvariation"
         evidence.append({"indicator": ind, "type": "voice_mechanics", "value": f"vocal jitter {jitter:.5f}"})
-        detected_indicators.append("Abnormally low vocal micro-jitter; speech exhibits mechanical, non-biological periodicity.")
+        detected_indicators.append({"indicator": ind, "description": "Abnormally low vocal micro-jitter; speech exhibits mechanical periodicity."})
 
     # 3. Monotone Robotic Pitch
     if f0_std < 5.0 and features.get("mean_f0_hz", 0) > 60:
-        prob_score += 0.25
+        indicator_score_raw += 0.25
         ind = "robotic_pitch_stability"
         evidence.append({"indicator": ind, "type": "pitch_tracking", "value": f"F0 std {f0_std:.1f}Hz"})
-        detected_indicators.append("Unnaturally flat pitch contour lacking human prosodic variation.")
+        detected_indicators.append({"indicator": ind, "description": "Unusually flat pitch contour with little prosodic variation."})
 
     # 4. Digital Silence Dropouts
     if silence_frac >= 0.08:
-        prob_score += 0.20
+        indicator_score_raw += 0.20
         ind = "unnatural_silence_dropout"
         evidence.append({"indicator": ind, "type": "temporal_silence", "value": f"silence fraction {silence_frac:.2f}"})
-        detected_indicators.append("Artificial digital zero-energy dropouts rather than natural room acoustic ambiance.")
+        detected_indicators.append({"indicator": ind, "description": "Digital zero-energy dropouts were observed."})
 
-    manip_prob = round(min(0.96, max(0.03, prob_score)), 4)
-    auth_score = round(1.0 - manip_prob, 4)
-    concern_level, classification = _determine_concern(manip_prob)
-    confidence = round(min(0.95, 0.70 + 0.05 * len(detected_indicators)), 2)
+    voice_origin = _assess_voice_origin(features, detected_indicators)
+    evidence.append({
+        "indicator": "voice_origin_assessment",
+        "type": "heuristic_classification",
+        "value": voice_origin["classification"],
+    })
+    indicator_score = round(min(0.96, max(0.03, indicator_score_raw)), 4)
+    concern_level, classification = _determine_concern(indicator_score)
 
     features.update({
-        "authenticity_score": auth_score,
-        "manipulation_probability": manip_prob,
-        "confidence": confidence,
+        "authenticity_score": None,
+        "manipulation_probability": None,
+        "manipulation_indicator_score": indicator_score,
+        "confidence": None,
         "concern_level": concern_level,
-        "detected_indicators": detected_indicators,
+        "detected_indicators": [item["description"] for item in detected_indicators],
+        "voice_origin": voice_origin,
     })
 
     limitations = [
         EPISTEMIC_LIMITATION,
         "Acoustic spectral cutoffs can also occur in bandlimited telephone or low-bitrate compression channels.",
     ]
+    if features.get("analysis_truncated"):
+        limitations.append("Only the first 10 seconds of audio were analyzed.")
 
     model_output = _optional_model(model, p, features, "audio")
-    method, model_version = "acoustic_and_prosodic_heuristics", None
+    method, model_version, confidence = "acoustic_and_prosodic_heuristics", None, None
     if model_output:
         output, model_evidence = model_output
         classification = output["classification"]
         evidence.extend(model_evidence)
         limitations.extend(output.get("limitations", []))
         method, model_version, confidence = "ml", model.model_version, output.get("confidence")
+        if output.get("voice_origin") is not None:
+            features["voice_origin"] = output["voice_origin"]
+            for item in evidence:
+                if item.get("indicator") == "voice_origin_assessment":
+                    item["type"] = "trained_model_classification"
+                    item["value"] = output["voice_origin"]["classification"]
 
     elapsed = (time.perf_counter() - start) * 1000
     return _result(
@@ -391,7 +456,12 @@ def analyze_video(path: str | Path, model: VideoDeepfakeModel | None = None) -> 
     try:
         features = extract_video_features(p)
     except Exception as exc:
-        features = {"byte_length": len(data), "sha256": hashlib.sha256(data).hexdigest(), "extraction_error": str(exc)}
+        return _extraction_failure("video", p, exc, start)
+
+    if features.get("temporal_continuity") == "empty_or_unreadable" or features.get("total_frames", 0) <= 0:
+        return _extraction_failure(
+            "video", p, ValueError("no readable video frames were found"), start
+        )
 
     evidence.append({
         "indicator": "video_stream_properties",
@@ -403,7 +473,7 @@ def analyze_video(path: str | Path, model: VideoDeepfakeModel | None = None) -> 
         },
     })
 
-    prob_score = 0.04  # baseline benign
+    indicator_score_raw = 0.04
 
     ssim_drops = features.get("ssim_drop_count", 0)
     min_ssim = features.get("min_interframe_ssim", 1.0)
@@ -414,41 +484,40 @@ def analyze_video(path: str | Path, model: VideoDeepfakeModel | None = None) -> 
 
     # 1. Temporal Continuity & Inter-Frame SSIM Drops
     if ssim_drops >= 1 or min_ssim < 0.85:
-        prob_score += 0.45
+        indicator_score_raw += 0.45
         ind = "temporal_frame_discontinuity"
         evidence.append({"indicator": ind, "type": "temporal_consistency", "value": f"{ssim_drops} drops, min SSIM {min_ssim:.2f}"})
         detected_indicators.append("Significant frame-to-frame structural discontinuity (SSIM drop) indicating spliced or swapped frames.")
 
     # 2. Optical Flow Jitter & Motion Warping
     if optical_jitter >= 2.5:
-        prob_score += 0.35
+        indicator_score_raw += 0.35
         ind = "optical_flow_jitter"
         evidence.append({"indicator": ind, "type": "motion_vectors", "value": f"jitter magnitude {optical_jitter:.2f}"})
         detected_indicators.append("Irregular optical flow velocity variance suggesting face boundary warping or temporal swimming.")
 
     # 3. Luminance / Lighting Flicker
     if lum_flicker >= 0.08:
-        prob_score += 0.20
+        indicator_score_raw += 0.20
         ind = "luminance_temporal_flicker"
         evidence.append({"indicator": ind, "type": "illumination", "value": f"flicker ratio {lum_flicker:.3f}"})
         detected_indicators.append("Unnatural frame-to-frame exposure or color temperature flickering.")
 
     # 4. Keyframe Visual Splicing
     if key_ela >= 4.0 or key_fft >= 1.5:
-        prob_score += 0.30
+        indicator_score_raw += 0.30
         ind = "keyframe_visual_anomaly"
         evidence.append({"indicator": ind, "type": "keyframe_artifacts", "value": f"ELA {key_ela:.1f}, FFT {key_fft:.2f}"})
         detected_indicators.append("Keyframes exhibit compression or generative frequency artifacts.")
 
-    manip_prob = round(min(0.96, max(0.03, prob_score)), 4)
-    auth_score = round(1.0 - manip_prob, 4)
-    concern_level, classification = _determine_concern(manip_prob)
-    confidence = round(min(0.95, 0.70 + 0.05 * len(detected_indicators)), 2)
+    indicator_score = round(min(0.96, max(0.03, indicator_score_raw)), 4)
+    concern_level, classification = _determine_concern(indicator_score)
 
     features.update({
-        "authenticity_score": auth_score,
-        "manipulation_probability": manip_prob,
-        "confidence": confidence,
+        "authenticity_score": None,
+        "manipulation_probability": None,
+        "manipulation_indicator_score": indicator_score,
+        "confidence": None,
         "concern_level": concern_level,
         "detected_indicators": detected_indicators,
     })
@@ -459,7 +528,7 @@ def analyze_video(path: str | Path, model: VideoDeepfakeModel | None = None) -> 
     ]
 
     model_output = _optional_model(model, p, features, "video")
-    method, model_version = "temporal_continuity_and_optical_flow", None
+    method, model_version, confidence = "temporal_continuity_and_optical_flow", None, None
     if model_output:
         output, model_evidence = model_output
         classification = output["classification"]
@@ -478,4 +547,3 @@ def analyze_video(path: str | Path, model: VideoDeepfakeModel | None = None) -> 
         model_version=model_version,
         elapsed=elapsed,
     )
-

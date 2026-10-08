@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "CYBERGUARD Browser Protection",
+  "version": "1.0.0",
+  "description": "Analyze visited websites with the local CYBERGUARD detection pipeline.",
+  "minimum_chrome_version": "114",
+  "permissions": ["storage", "scripting", "sidePanel"],
+  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "optional_host_permissions": ["<all_urls>"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_title": "CYBERGUARD", "default_popup": "popup.html"},
+  "side_panel": {"default_path": "dashboard/index.html"}
+}

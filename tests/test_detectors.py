@@ -52,6 +52,9 @@ def test_url_bad_inputs_and_never_fetches():
     out = analyze_url("http://192.0.2.5/login").to_dict()
     assert out["classification"] == "suspicious_indicators"
     assert any("not prove" in limitation for limitation in out["limitations"])
+    assert out["confidence"] is None
+    assert out["features"]["malicious_url_probability"] is None
+    assert 0 <= out["features"]["malicious_url_indicator_score"] <= 1
 
 
 def test_security_features_are_separate_indicators():

@@ -73,11 +73,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         try:
             payload = self._body()
             if self.path == "/api/analyze":
-                return self._json(200, analyze_request(payload, asset_sensitivity=payload.get("asset_sensitivity", "medium")))
+                return self._json(200, analyze_request(payload))
             if self.path == "/api/analyze-demo":
                 return self._json(200, analyze_request(
                     payload,
-                    asset_sensitivity=payload.get("asset_sensitivity", "medium"),
                     persist_incident=False,
                 ))
             if self.path == "/api/multimedia-config":

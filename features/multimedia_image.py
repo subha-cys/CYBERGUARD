@@ -9,6 +9,9 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
+MAX_ANALYSIS_DIMENSION = 1024
+MAX_IMAGE_PIXELS = 40_000_000
+
 
 def _compute_ela(img: Image.Image, quality: int = 90) -> dict[str, float]:
     """Perform Error Level Analysis (ELA) by measuring recompression error."""
@@ -191,7 +194,7 @@ def _compute_lighting_and_edges(gray: np.ndarray) -> dict[str, float]:
 def extract_image_features(image_input: str | Path | bytes | Image.Image) -> dict[str, Any]:
     """Extract comprehensive authenticity indicators from an image."""
     if isinstance(image_input, Image.Image):
-        img = image_input
+        img = image_input.copy()
     elif isinstance(image_input, (str, Path)):
         img = Image.open(str(image_input))
     elif isinstance(image_input, bytes):
@@ -199,8 +202,12 @@ def extract_image_features(image_input: str | Path | bytes | Image.Image) -> dic
     else:
         raise TypeError(f"Unsupported image input type: {type(image_input)}")
 
+    width, height = img.size
+    if width <= 0 or height <= 0 or width * height > MAX_IMAGE_PIXELS:
+        raise ValueError(f"image dimensions exceed the {MAX_IMAGE_PIXELS}-pixel analysis limit")
+    img.thumbnail((MAX_ANALYSIS_DIMENSION, MAX_ANALYSIS_DIMENSION))
     rgb = img.convert("RGB")
-    width, height = rgb.size
+    analyzed_width, analyzed_height = rgb.size
     gray = np.asarray(rgb.convert("L"), dtype=np.float32)
 
     # 1. Error Level Analysis
@@ -219,6 +226,8 @@ def extract_image_features(image_input: str | Path | bytes | Image.Image) -> dic
         "width": width,
         "height": height,
         "aspect_ratio": round(width / max(1, height), 3),
+        "analyzed_width": analyzed_width,
+        "analyzed_height": analyzed_height,
         **ela_res,
         **fft_res,
         **noise_res,

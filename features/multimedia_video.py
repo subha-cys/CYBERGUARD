@@ -12,6 +12,20 @@ from PIL import Image
 
 from features.multimedia_image import extract_image_features
 
+MAX_ANALYSIS_FRAME_DIMENSION = 1024
+
+
+def _bound_frame(frame: np.ndarray) -> np.ndarray:
+    height, width = frame.shape[:2]
+    scale = min(1.0, MAX_ANALYSIS_FRAME_DIMENSION / max(height, width))
+    if scale < 1.0:
+        return cv2.resize(
+            frame,
+            (max(1, round(width * scale)), max(1, round(height * scale))),
+            interpolation=cv2.INTER_AREA,
+        )
+    return frame
+
 
 def _compute_ssim(img1: np.ndarray, img2: np.ndarray) -> float:
     """Compute Structural Similarity Index (SSIM) between two grayscale frames."""
@@ -60,7 +74,7 @@ def _sample_video_frames(
             ret, frame = cap.read()
             if not ret:
                 break
-            frames.append(frame)
+            frames.append(_bound_frame(frame))
         cap.release()
         return frames, {
             "total_frames": len(frames),
@@ -79,7 +93,7 @@ def _sample_video_frames(
         cap.set(cv2.CAP_PROP_POS_FRAMES, int(idx))
         ret, frame = cap.read()
         if ret and frame is not None:
-            frames.append(frame)
+            frames.append(_bound_frame(frame))
 
     cap.release()
     return frames, {

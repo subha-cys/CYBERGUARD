@@ -3,13 +3,32 @@ from __future__ import annotations
 
 import io
 import math
-import struct
 import wave
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import scipy.io.wavfile as wavfile
+
+MAX_ANALYSIS_SECONDS = 10
+
+
+def _decode_pcm(raw: bytes, sample_width: int) -> np.ndarray:
+    if sample_width == 1:
+        return (np.frombuffer(raw, dtype=np.uint8).astype(np.int16) - 128).astype(np.int8)
+    if sample_width == 2:
+        return np.frombuffer(raw, dtype=np.int16)
+    if sample_width == 3:
+        packed = np.frombuffer(raw, dtype=np.uint8)
+        if packed.size % 3:
+            raise ValueError("24-bit PCM stream contains a partial sample")
+        samples = packed.reshape(-1, 3).astype(np.int32)
+        decoded = samples[:, 0] | (samples[:, 1] << 8) | (samples[:, 2] << 16)
+        decoded[decoded & 0x800000 != 0] -= 0x1000000
+        return decoded << 8
+    if sample_width == 4:
+        return np.frombuffer(raw, dtype=np.int32)
+    raise ValueError(f"unsupported WAV sample width: {sample_width} bytes")
 
 
 def _load_audio_samples(audio_input: str | Path | bytes) -> tuple[np.ndarray, int]:
@@ -26,14 +45,7 @@ def _load_audio_samples(audio_input: str | Path | bytes) -> tuple[np.ndarray, in
                 nchannels = w.getnchannels()
                 sampwidth = w.getsampwidth()
                 raw = w.readframes(nframes)
-                if sampwidth == 2:
-                    data = np.frombuffer(raw, dtype=np.int16)
-                elif sampwidth == 1:
-                    data = np.frombuffer(raw, dtype=np.uint8) - 128
-                elif sampwidth == 4:
-                    data = np.frombuffer(raw, dtype=np.int32)
-                else:
-                    data = np.frombuffer(raw, dtype=np.int16)
+                data = _decode_pcm(raw, sampwidth)
                 if nchannels > 1:
                     data = data.reshape(-1, nchannels)
     elif isinstance(audio_input, bytes):
@@ -45,11 +57,16 @@ def _load_audio_samples(audio_input: str | Path | bytes) -> tuple[np.ndarray, in
                 nchannels = w.getnchannels()
                 sampwidth = w.getsampwidth()
                 raw = w.readframes(w.getnframes())
-                data = np.frombuffer(raw, dtype=np.int16 if sampwidth == 2 else np.int32)
+                data = _decode_pcm(raw, sampwidth)
                 if nchannels > 1:
                     data = data.reshape(-1, nchannels)
     else:
         raise TypeError(f"Unsupported audio input type: {type(audio_input)}")
+
+    if sr <= 0:
+        raise ValueError("audio sample rate must be positive")
+    if data.size == 0:
+        raise ValueError("audio stream contains no samples")
 
     # Stereo to mono
     if data.ndim > 1:
@@ -57,12 +74,17 @@ def _load_audio_samples(audio_input: str | Path | bytes) -> tuple[np.ndarray, in
 
     # Convert to float32 [-1.0, 1.0]
     if np.issubdtype(data.dtype, np.integer):
-        max_val = float(np.iinfo(data.dtype).max)
-        float_data = (data / max_val).astype(np.float32)
+        if data.dtype == np.uint8:
+            float_data = ((data.astype(np.float32) - 128.0) / 128.0).astype(np.float32)
+        else:
+            max_val = float(np.iinfo(data.dtype).max)
+            float_data = (data / max_val).astype(np.float32)
     else:
         float_data = data.astype(np.float32)
 
-    return float_data, sr
+    if not np.all(np.isfinite(float_data)):
+        raise ValueError("audio stream contains non-finite samples")
+    return np.clip(float_data, -1.0, 1.0), sr
 
 
 def _compute_spectral_features(samples: np.ndarray, sr: int) -> dict[str, float]:
@@ -204,7 +226,12 @@ def _compute_silence_and_continuity(samples: np.ndarray, sr: int) -> dict[str, f
 def extract_audio_features(audio_input: str | Path | bytes) -> dict[str, Any]:
     """Extract comprehensive authenticity indicators from audio."""
     samples, sr = _load_audio_samples(audio_input)
-    duration = round(len(samples) / max(1, sr), 3)
+    source_sample_count = len(samples)
+    duration = round(source_sample_count / sr, 3)
+    max_samples = sr * MAX_ANALYSIS_SECONDS
+    if source_sample_count > max_samples:
+        samples = samples[:max_samples]
+    analyzed_duration = round(len(samples) / sr, 3)
 
     spectral_res = _compute_spectral_features(samples, sr)
     pitch_res = _compute_pitch_and_microvariation(samples, sr)
@@ -213,6 +240,8 @@ def extract_audio_features(audio_input: str | Path | bytes) -> dict[str, Any]:
     return {
         "sample_rate_hz": sr,
         "duration_seconds": duration,
+        "analyzed_duration_seconds": analyzed_duration,
+        "analysis_truncated": source_sample_count > len(samples),
         "sample_count": len(samples),
         **spectral_res,
         **pitch_res,

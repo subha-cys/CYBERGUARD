@@ -28,7 +28,7 @@ def recommend(fusion: dict, risk: dict) -> list[dict]:
             ("require_mfa_review", "Review MFA requirements for the affected account."),
             ("credential_reset_if_compromise_confirmed", "Reset credentials if the analyst confirms compromise."),
         ])
-    elif threat == "multimedia_manipulation":
+    elif threat in {"multimedia_manipulation", "synthetic_voice"}:
         actions.extend([
             ("preserve_evidence", "Preserve the original media and provenance/context for review."),
             ("verify_identity_independently", "Verify any identity claim through a known, independent contact channel."),

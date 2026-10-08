@@ -23,6 +23,18 @@ def test_prefilled_demo_analysis_is_not_persisted(tmp_path, monkeypatch):
     assert not incidents_db.exists()
 
 
+def test_analysis_uses_inferred_sensitivity_not_client_value():
+    result = service.analyze_request({
+        "type": "url",
+        "url": "https://example.org/about",
+        "asset_sensitivity": "critical",
+    }, persist_incident=False)
+
+    assert result["asset_sensitivity"]["level"] == "medium"
+    assert result["risk"]["asset_sensitivity"] == "medium"
+    assert result["risk"]["asset_sensitivity_assessment"]["method"] == "local_sensitive_content_rules"
+
+
 def test_real_analysis_cannot_suppress_persistence_with_demo_payload(tmp_path, monkeypatch):
     dashboard_db = tmp_path / "dashboard.sqlite3"
     incidents_db = tmp_path / "incidents.sqlite3"

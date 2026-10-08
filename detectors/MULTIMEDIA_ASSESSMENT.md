@@ -1,6 +1,10 @@
 # MULTIMEDIA MANIPULATION ASSESSMENT
 
-The detector accepts image, audio, and video file paths and returns the shared `DetectorResult` contract. It is a conservative format and context assessment. It is **not** a universal deepfake detector, and the repository has no validated image, audio, or video model installed.
+The detector accepts image, audio, and video file paths and returns the shared `DetectorResult` contract. It is a conservative format and context assessment. It is **not** a universal deepfake detector, and the repository does not bundle a validated image, audio, or video model.
+
+Audio results include a separate `features.voice_origin` assessment: `likely_ai_generated`, `likely_human`, or `inconclusive`. Without a trained audio artifact this is a no-dependency acoustic heuristic reusing spectral, pitch, and voice micro-variation features. It reports no confidence score and is not validated on representative speech data; codec, bandwidth, noise reduction, speaking style, and health can affect its cues. Treat it as a triage hint only, never proof that a voice is AI-generated or human. Fusion raises the `synthetic_voice` category only for the `likely_ai_generated` label.
+
+The heuristic `features.manipulation_indicator_score` is a hand-weighted indicator score, not a probability. Heuristic confidence and authenticity scores are returned as unavailable (`null`), not invented. If feature extraction fails, the classification is `inconclusive`. A trained modality model can replace the heuristic classification when installed at `models/media/{image,audio,video}.joblib`; the model's score remains explicitly uncalibrated and the adapter emits no confidence. See [model training](../MODEL_TRAINING.md).
 
 ## Current pipeline
 
@@ -13,7 +17,7 @@ The exact limitation `Manipulation cannot be determined from available evidence.
 
 ## Model adapters
 
-Implement `ImageManipulationModel`, `AudioDeepfakeModel`, or `VideoDeepfakeModel` and pass the instance to the matching `analyze_*` function. Adapters must provide `model_version`, `evaluation_reference`, and a supported categorical result. A returned confidence is passed through only if the model supplies it; the adapter does not synthesize one. Before enabling an adapter, document dataset license/provenance, consent/authorization, evaluation split design, subgroup performance, calibration, operating threshold, and known limits. No public media corpus is downloaded or bundled by this module.
+Implement `ImageManipulationModel`, `AudioDeepfakeModel`, or `VideoDeepfakeModel` and pass the instance to the matching `analyze_*` function. Adapters must provide `model_version`, `evaluation_reference`, and a supported categorical result. A returned confidence is passed through only if the model supplies it; the adapter does not synthesize one. Before enabling an adapter, document dataset license/provenance, consent/authorization, group-safe evaluation split design, subgroup performance, calibration, operating threshold, and known limits. No public media corpus is downloaded or bundled by this module.
 
 ## Supported formats and runtime tools
 
